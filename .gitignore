@@ -1,0 +1,23 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# config / logs / runtime
+config.ini
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# tests/scratch
+incoming/
+processing/
+done/
+error/
