@@ -1,17 +1,18 @@
-"""watchdog Observer 래퍼 — incoming/ 폴더에 PDF 신규 파일이 들어오면 큐에 추가."""
+"""watchdog Observer 래퍼 — incoming/ 폴더에 PDF 신규 파일이 들어오면 콜백 호출."""
 
 from __future__ import annotations
 
 import logging
 import time
 from pathlib import Path
+from typing import Callable
 
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
-from .pairing import PairingQueue
-
 logger = logging.getLogger(__name__)
+
+PdfCallback = Callable[[Path], None]
 
 
 def _wait_until_stable(path: Path, max_wait: float = 8.0, poll: float = 0.15) -> bool:
@@ -34,8 +35,8 @@ def _wait_until_stable(path: Path, max_wait: float = 8.0, poll: float = 0.15) ->
 
 
 class _IncomingHandler(FileSystemEventHandler):
-    def __init__(self, queue: PairingQueue) -> None:
-        self._queue = queue
+    def __init__(self, on_pdf: PdfCallback) -> None:
+        self._on_pdf = on_pdf
 
     def on_created(self, event: FileSystemEvent) -> None:
         if event.is_directory:
@@ -46,7 +47,7 @@ class _IncomingHandler(FileSystemEventHandler):
         if not _wait_until_stable(path):
             logger.warning("file disappeared or unstable: %s", path.name)
             return
-        self._queue.add(path)
+        self._on_pdf(path)
 
     def on_moved(self, event: FileSystemEvent) -> None:
         # 이름 변경/이동도 신규 입력으로 취급
@@ -58,11 +59,11 @@ class _IncomingHandler(FileSystemEventHandler):
             return
         if not _wait_until_stable(path):
             return
-        self._queue.add(path)
+        self._on_pdf(path)
 
 
-def start_observer(incoming_dir: Path, queue: PairingQueue) -> Observer:
-    handler = _IncomingHandler(queue)
+def start_observer(incoming_dir: Path, on_pdf: PdfCallback) -> Observer:
+    handler = _IncomingHandler(on_pdf)
     observer = Observer()
     observer.schedule(handler, str(incoming_dir), recursive=False)
     observer.start()
