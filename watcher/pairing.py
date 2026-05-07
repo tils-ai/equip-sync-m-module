@@ -1,8 +1,15 @@
-"""FIFO 페어링 큐. 2건 모이면 콜백 호출. 1건만 있으면 대기."""
+"""FIFO 페어링 큐. 2개 슬롯이 모이면 콜백 호출. 1개만 있으면 대기.
+
+파일명 규칙으로 수량 표현:
+  - {base}.pdf            → qty=1 (기본)
+  - {base}_qty2.pdf       → qty=2 (한 디자인 두 번 배치)
+  - {base}_qty3.pdf       → qty=3
+"""
 
 from __future__ import annotations
 
 import logging
+import re
 import threading
 from collections import deque
 from pathlib import Path
@@ -10,9 +17,26 @@ from typing import Callable
 
 logger = logging.getLogger(__name__)
 
+_QTY_RE = re.compile(r"_qty(\d+)(?=\.pdf$)", re.IGNORECASE)
+
+
+def parse_qty(path: Path) -> int:
+    """파일명 끝의 `_qtyN.pdf` 패턴에서 수량을 파싱. 없으면 1."""
+    m = _QTY_RE.search(path.name)
+    if m:
+        try:
+            return max(1, int(m.group(1)))
+        except ValueError:
+            pass
+    return 1
+
 
 class PairingQueue:
-    """thread-safe FIFO. 2건이 쌓이면 콜백을 별도 스레드로 호출."""
+    """thread-safe FIFO. 2슬롯 모이면 콜백을 별도 스레드로 호출.
+
+    동일 path가 qty만큼 큐에 적재 — 같은 디자인이 여러 슬롯에 배치되는 시나리오 지원.
+    watchdog 중복 이벤트는 큐 내 동일 path 카운트가 이미 qty와 같으면 무시한다.
+    """
 
     def __init__(self, on_pair: Callable[[Path, Path], None]) -> None:
         self._lock = threading.Lock()
@@ -20,50 +44,35 @@ class PairingQueue:
         self._on_pair = on_pair
 
     def add(self, path: Path) -> None:
+        qty = parse_qty(path)
         pair = None
         with self._lock:
-            if any(p == path for p in self._items):
-                logger.debug("ignore duplicate enqueue: %s", path.name)
+            existing = sum(1 for p in self._items if p == path)
+            if existing >= qty:
+                logger.debug("ignore duplicate enqueue: %s (existing=%d, qty=%d)", path.name, existing, qty)
                 return
-            self._items.append(path)
+            for _ in range(qty - existing):
+                self._items.append(path)
             depth = len(self._items)
             if depth >= 2:
                 a = self._items.popleft()
                 b = self._items.popleft()
                 pair = (a, b)
-        logger.info("queued: %s (depth=%d)", path.name, depth)
+        logger.info("queued: %s qty=%d (depth=%d)", path.name, qty, depth)
         if pair is not None:
             self._dispatch(*pair)
 
-    def restore_from_disk(self, incoming_dir: Path) -> None:
-        """기동 시 incoming/에 남아있는 PDF를 mtime 순으로 큐에 적재 후 가능하면 페어링."""
-        existing = sorted(
-            (p for p in incoming_dir.glob("*.pdf") if p.is_file()),
-            key=lambda p: p.stat().st_mtime,
-        )
-        pairs: list[tuple[Path, Path]] = []
-        with self._lock:
-            self._items.clear()
-            for p in existing:
-                self._items.append(p)
-            while len(self._items) >= 2:
-                a = self._items.popleft()
-                b = self._items.popleft()
-                pairs.append((a, b))
-
-        if existing:
-            logger.info("restored %d pending file(s)", len(existing))
-        for a, b in pairs:
-            self._dispatch(a, b)
-
     def remove(self, path: Path) -> bool:
-        """대기 중인 항목을 제거. 페어링 처리 중이면 영향 없음."""
+        """대기 중인 항목을 제거 (모든 인스턴스). 페어링 처리 중이면 영향 없음."""
+        removed = False
         with self._lock:
-            try:
-                self._items.remove(path)
-                return True
-            except ValueError:
-                return False
+            while True:
+                try:
+                    self._items.remove(path)
+                    removed = True
+                except ValueError:
+                    break
+        return removed
 
     def snapshot(self) -> list[Path]:
         with self._lock:
