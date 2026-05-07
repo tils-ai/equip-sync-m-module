@@ -45,7 +45,7 @@ class PairingQueue:
 
     def add(self, path: Path) -> None:
         qty = parse_qty(path)
-        pair = None
+        pairs: list[tuple[Path, Path]] = []
         with self._lock:
             existing = sum(1 for p in self._items if p == path)
             if existing >= qty:
@@ -54,13 +54,14 @@ class PairingQueue:
             for _ in range(qty - existing):
                 self._items.append(path)
             depth = len(self._items)
-            if depth >= 2:
+            # qty가 2 이상이면 한 번의 add로 여러 쌍이 가능 — 가능한 모든 쌍을 dispatch.
+            while len(self._items) >= 2:
                 a = self._items.popleft()
                 b = self._items.popleft()
-                pair = (a, b)
-        logger.info("queued: %s qty=%d (depth=%d)", path.name, qty, depth)
-        if pair is not None:
-            self._dispatch(*pair)
+                pairs.append((a, b))
+        logger.info("queued: %s qty=%d (depth=%d, dispatched=%d)", path.name, qty, depth, len(pairs))
+        for a, b in pairs:
+            self._dispatch(a, b)
 
     def remove(self, path: Path) -> bool:
         """대기 중인 항목을 제거 (모든 인스턴스). 페어링 처리 중이면 영향 없음."""

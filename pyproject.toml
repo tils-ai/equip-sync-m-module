@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "equip-sync-m-module"
-version = "0.2.1"
+version = "0.2.2"
 description = "Mug transfer printer watcher (DPS Store)"
 readme = "README.md"
 requires-python = ">=3.11"
