@@ -1,26 +1,37 @@
 # equip-sync-m-module
 
-머그컵 생산용 **전사지 출력 프린터** 자동화 워처.
+머그컵 생산용 **전사지 출력 프린터** 자동화 워처 (Windows, Python).
 
-## 동작
+## 기능
 
-`incoming/` 폴더에 PDF 파일이 추가되면 감지하여 다음 작업을 수행합니다.
+- **자동 좌우 반전** — 전사지에 거울상으로 출력해야 머그에 입혔을 때 정상 방향
+- **A4 가로 2-up 배치** — 두 건을 위·아래로 묶어 한 장에 출력 (전사지 절약)
+- **GUI** — 실시간 큐 대시보드, 다크/라이트/시스템 테마 즉시 전환
+- **백그라운드 워처** — `incoming/` 폴더에 PDF가 들어오면 자동 처리
 
-1. **좌우 반전** — 전사지에 거울상으로 출력해야 머그컵에 입혔을 때 정상 방향이 됨
-2. **2건 페어링** — FIFO로 두 건이 쌓일 때까지 대기
-3. **A4 가로 2-up 배치** — A4(297×210mm) 가로 한 장에 위·아래로 두 건을 배치
-4. **`done/` 이동** — 합쳐진 1장의 PDF를 완료 폴더로 옮김
+## 동작 흐름
 
-> 1건만 들어와 있으면 다음 1건이 들어올 때까지 무기한 대기합니다 (시간 임계치 없음).
-
-자동 인쇄·API 풀링·GUI는 v2에서 추가됩니다.
+```
+incoming/{order}.pdf 추가
+   ↓ 좌우 반전
+   ↓ FIFO 큐 (1건은 다음 1건 대기)
+   ↓ 2건 모이면: A4 가로 한 장에 위·아래 contain 배치
+   ↓ done/{ts}-{uuid}.pdf
+   원본 → done/originals/ (기본 보관)
+```
 
 ## 요구사항
 
 - Windows 10/11
-- Python 3.11+
+- Python 3.11+ (개발 시) — 릴리즈 빌드는 단일 실행 파일
 
-## 설치 (개발 / 직접 실행)
+## 설치 및 실행
+
+### 릴리즈 빌드 사용 (권장)
+
+[Releases](https://github.com/tils-ai/equip-sync-m-module/releases) 페이지에서 최신 zip 다운로드 → 압축 해제 → `equip-sync-m.exe` 실행.
+
+### 소스에서 실행 (개발)
 
 ```bash
 git clone https://github.com/tils-ai/equip-sync-m-module
@@ -28,28 +39,38 @@ cd equip-sync-m-module
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
-python -m watcher
+python -m watcher              # GUI 실행
+python -m watcher --headless   # 콘솔 모드
 ```
 
-릴리즈된 단일 실행 파일(.exe)은 추후 GitHub Releases로 배포 예정.
+## GUI
+
+| 탭 | 내용 |
+| --- | --- |
+| Dashboard | Watcher 상태(시작/중지), 대기/처리중/완료/오류 카운트, 폴더 바로가기, 최근 완료 목록 |
+| Settings | `config.ini` 위치 + 내용 미리보기, 외부 편집기로 열기 |
+| Agent | 페어링 정보 입력/삭제 (v0.2 스켈레톤, 실제 풀링은 v0.3 예정) |
+
+상단 우측 **테마** 메뉴에서 `시스템 / 라이트 / 다크` 즉시 전환 — 선택값은 `config.ini`에 저장됩니다.
 
 ## 폴더 구조 (운영 시)
 
-기본값(`%LOCALAPPDATA%\equip-sync-m-module\`):
+기본값 `%LOCALAPPDATA%\equip-sync-m-module\`:
 
 ```
-incoming/      ← PDF 드롭 (감시 대상)
-processing/    ← 처리 중 (락 마커 역할)
-done/          ← 완료된 A4 2-up PDF
-done/originals/ ← 원본 보관 (keep_originals=true 일 때)
-error/         ← 처리 실패한 원본
-logs/          ← 로그 파일 (rotating)
-config.ini     ← 운영자 설정 (자동 생성)
+incoming/        ← PDF 드롭 (감시 대상)
+processing/      ← 처리 중
+done/            ← 완료된 A4 2-up PDF
+done/originals/  ← 원본 보관 (keep_originals=true)
+error/           ← 처리 실패한 원본
+logs/            ← rotating 로그
+config.ini       ← 운영자 설정 (자동 생성)
+agent.json       ← 에이전트 페어링 정보 (v0.3+)
 ```
 
 ## config.ini
 
-첫 실행 시 자동 생성됩니다.
+첫 실행 시 자동 생성. 주요 항목:
 
 ```ini
 [paths]
@@ -61,8 +82,14 @@ mirror = horizontal      ; horizontal | none
 fit = contain            ; contain | cover
 keep_originals = true    ; 원본 보관 여부
 
+[gui]
+appearance = system      ; system | light | dark
+
 [printer]
-name =                   ; v2 자동 인쇄 시 사용
+name =                   ; v0.3 자동 인쇄 시 사용
+
+[log]
+level = INFO
 ```
 
 ## 라이선스
