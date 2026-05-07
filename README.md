@@ -13,12 +13,35 @@
 
 ```
 incoming/{order}.pdf 추가
-   ↓ 좌우 반전
-   ↓ FIFO 큐 (1건은 다음 1건 대기)
-   ↓ 2건 모이면: A4 가로 한 장에 위·아래 contain 배치
-   ↓ done/{ts}-{uuid}.pdf
+   ↓ 사이즈 검사 (절반 A4 가로 = 297×105mm 슬롯에 맞는지)
+   ├─ 맞음  → FIFO 큐 (1건은 다음 1건 대기)
+   │            ↓ 2건 모이면: A4 가로 한 장에 위·아래 배치 (좌우 반전)
+   │            ↓ done/{ts}-{uuid}.pdf
+   └─ 초과 → 설정에 따라 (error/ 이동) 또는 (1-up 단독 출력)
    원본 → done/originals/ (기본 보관)
 ```
+
+## 수량 (한 디자인을 여러 슬롯에 배치)
+
+파일명 끝의 `_qtyN.pdf` 패턴으로 수량을 표현합니다.
+
+| 파일명 | 동작 |
+| --- | --- |
+| `order123.pdf` | 1슬롯 (다른 1건과 페어링) |
+| `order123_qty2.pdf` | 2슬롯 (같은 디자인 두 번 → 한 장 출력) |
+| `order123_qty3.pdf` | 3슬롯 (둘은 같은 디자인 한 장 + 1슬롯은 다음 1건과 페어링) |
+
+향후 v0.3 Agent에서는 dps-store API의 주문 수량으로 자동 결정됩니다.
+
+## 설정 (GUI 또는 config.ini)
+
+GUI 설정 탭의 파이프라인 폼에서 즉시 변경:
+
+| 항목 | 값 | 설명 |
+| --- | --- | --- |
+| 좌우 반전 | `horizontal` / `none` | 전사지는 거울상이 정상 — `horizontal` 권장 |
+| 배치 방식 | `original` / `contain` / `cover` | 기본 `original`(원본 사이즈 유지). 슬롯보다 크면 자동 contain 폴백 |
+| 사이즈 초과 시 | `error` / `single` | 초과 디자인 처리 — `error`(에러 폴더) 또는 `single`(1-up 단독 출력) |
 
 ## 요구사항
 
@@ -79,8 +102,9 @@ done = ...               ; 결과 폴더
 
 [pipeline]
 mirror = horizontal      ; horizontal | none
-fit = contain            ; contain | cover
+fit = original           ; original | contain | cover
 keep_originals = true    ; 원본 보관 여부
+oversize_action = error  ; error | single (사이즈 초과 디자인 처리)
 
 [gui]
 appearance = system      ; system | light | dark
