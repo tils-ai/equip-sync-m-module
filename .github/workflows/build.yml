@@ -25,14 +25,14 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: Build (PyInstaller)
-        run: pyinstaller --noconfirm --onedir --windowed --collect-data customtkinter --collect-submodules watcher --collect-submodules gui --collect-submodules agent --name equip-sync-m main.py
+      - name: Build (PyInstaller — 단일 .exe)
+        run: pyinstaller --noconfirm --onefile --windowed --collect-data customtkinter --collect-submodules watcher --collect-submodules gui --collect-submodules agent --name equip-sync-m main.py
 
-      - name: Package zip
+      - name: Rename artifact (버전 포함)
         shell: pwsh
         run: |
-          $name = "equip-sync-m-${{ github.ref_name }}.zip"
-          Compress-Archive -Path dist/equip-sync-m -DestinationPath "dist/$name"
+          $name = "equip-sync-m-${{ github.ref_name }}.exe"
+          Rename-Item -Path "dist/equip-sync-m.exe" -NewName $name
           echo "ARTIFACT=dist/$name" >> $env:GITHUB_ENV
 
       - uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0

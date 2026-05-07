@@ -52,7 +52,10 @@ GUI 설정 탭의 파이프라인 폼에서 즉시 변경:
 
 ### 릴리즈 빌드 사용 (권장)
 
-[Releases](https://github.com/tils-ai/equip-sync-m-module/releases) 페이지에서 최신 zip 다운로드 → 압축 해제 → `equip-sync-m.exe` 실행.
+[Releases](https://github.com/tils-ai/equip-sync-m-module/releases) 페이지에서 단일 `equip-sync-m-vX.Y.Z.exe` 다운로드 → 더블 클릭 실행.
+
+> 첫 실행 시 임시 폴더에 자체 추출 → 5\~10초 정도 지연될 수 있습니다 (PyInstaller `--onefile` 특성).
+> SmartScreen 경고가 뜨면 "추가 정보 → 실행" 선택.
 
 ### 소스에서 실행 (개발)
 
