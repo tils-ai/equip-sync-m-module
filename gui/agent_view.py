@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
+from watcher.fonts import family as _font_family
+
 from agent.state import AgentState, clear_state, load_state, save_state
 
 
@@ -24,14 +26,14 @@ class AgentTab(ctk.CTkFrame):
             header,
             text="에이전트 (dps-store API 연동)",
             anchor="w",
-            font=ctk.CTkFont(size=14, weight="bold"),
+            font=ctk.CTkFont(family=_font_family(), size=14, weight="bold"),
         ).grid(row=0, column=0, sticky="ew")
 
         ctk.CTkLabel(
             header,
             text="비활성",
             text_color=("#9ca3af", "#6b7280"),
-            font=ctk.CTkFont(size=11),
+            font=ctk.CTkFont(family=_font_family(), size=11),
         ).grid(row=0, column=1, sticky="e")
 
         ctk.CTkLabel(
@@ -43,7 +45,7 @@ class AgentTab(ctk.CTkFrame):
             justify="left",
             anchor="w",
             text_color=("#6b7280", "#9ca3af"),
-            font=ctk.CTkFont(size=12),
+            font=ctk.CTkFont(family=_font_family(), size=12),
         ).grid(row=1, column=0, columnspan=2, sticky="ew", padx=12, pady=(0, 12))
 
         # 입력 필드 ──────────────────────────────────────────

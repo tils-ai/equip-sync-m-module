@@ -10,6 +10,8 @@ from typing import Callable, Optional
 
 import customtkinter as ctk
 
+from watcher.fonts import family as _font_family
+
 from watcher.config import Config
 from watcher.service import WatcherService
 
@@ -54,7 +56,7 @@ class DashboardTab(ctk.CTkFrame):
         status_row.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 6))
         status_row.grid_columnconfigure(1, weight=1)
 
-        self.status_dot = ctk.CTkLabel(status_row, text="●", font=ctk.CTkFont(size=18))
+        self.status_dot = ctk.CTkLabel(status_row, text="●", font=ctk.CTkFont(family=_font_family(), size=18))
         self.status_dot.grid(row=0, column=0, padx=(0, 8))
 
         self.status_label = ctk.CTkLabel(status_row, text="Watcher: -", anchor="w")
@@ -75,8 +77,8 @@ class DashboardTab(ctk.CTkFrame):
         ):
             card = ctk.CTkFrame(counts_row, corner_radius=8)
             card.grid(row=0, column=i, padx=4, sticky="nsew")
-            ctk.CTkLabel(card, text=label, font=ctk.CTkFont(size=11)).pack(pady=(8, 0))
-            value = ctk.CTkLabel(card, text="0", font=ctk.CTkFont(size=22, weight="bold"))
+            ctk.CTkLabel(card, text=label, font=ctk.CTkFont(family=_font_family(), size=11)).pack(pady=(8, 0))
+            value = ctk.CTkLabel(card, text="0", font=ctk.CTkFont(family=_font_family(), size=22, weight="bold"))
             value.pack(pady=(0, 8))
             self.cards[key] = value
 
@@ -97,7 +99,7 @@ class DashboardTab(ctk.CTkFrame):
             ).grid(row=0, column=i, padx=4, sticky="ew")
 
         # ── 최근 결과 ────────────────────────────────────────
-        recent_label = ctk.CTkLabel(self, text="최근 완료 (5건)", anchor="w", font=ctk.CTkFont(size=12, weight="bold"))
+        recent_label = ctk.CTkLabel(self, text="최근 완료 (5건)", anchor="w", font=ctk.CTkFont(family=_font_family(), size=12, weight="bold"))
         recent_label.grid(row=3, column=0, sticky="w", padx=12, pady=(12, 4))
 
         self.recent_box = ctk.CTkTextbox(self, height=140, activate_scrollbars=True, wrap="none")

@@ -13,6 +13,7 @@ import sys
 import time
 
 from .config import Config, ensure_dirs, load_config
+from .fonts import register as register_fonts
 from .logger import setup_logging
 from .service import WatcherService
 
@@ -23,7 +24,8 @@ def _bootstrap() -> Config:
     cfg = load_config()
     setup_logging(cfg.log_file, cfg.log_level)
     ensure_dirs(cfg)
-    logger.info("equip-sync-m-module starting (config: %s)", cfg.config_path)
+    family = register_fonts()
+    logger.info("equip-sync-m-module starting (config: %s, font: %s)", cfg.config_path, family)
     return cfg
 
 

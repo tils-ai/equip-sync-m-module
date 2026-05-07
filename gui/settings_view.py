@@ -9,6 +9,8 @@ from pathlib import Path
 
 import customtkinter as ctk
 
+from watcher.fonts import family as _font_family
+
 from watcher.config import Config, save_pipeline_settings
 
 MIRROR_LABELS = {"horizontal": "좌우 반전", "none": "반전 안 함"}
@@ -56,7 +58,7 @@ class SettingsTab(ctk.CTkFrame):
         form.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 8))
         form.grid_columnconfigure(1, weight=1)
 
-        ctk.CTkLabel(form, text="파이프라인 설정", anchor="w", font=ctk.CTkFont(size=13, weight="bold")).grid(
+        ctk.CTkLabel(form, text="파이프라인 설정", anchor="w", font=ctk.CTkFont(family=_font_family(), size=13, weight="bold")).grid(
             row=0, column=0, columnspan=3, sticky="w", padx=12, pady=(10, 6)
         )
 
@@ -89,7 +91,7 @@ class SettingsTab(ctk.CTkFrame):
         header.grid(row=1, column=0, sticky="ew", padx=12, pady=(8, 4))
         header.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(header, text=str(cfg.config_path), anchor="w", font=ctk.CTkFont(size=11)).grid(
+        ctk.CTkLabel(header, text=str(cfg.config_path), anchor="w", font=ctk.CTkFont(family=_font_family(), size=11)).grid(
             row=0, column=0, sticky="ew"
         )
         ctk.CTkButton(header, text="에디터로 열기", width=110, command=lambda: _open_in_editor(cfg.config_path)).grid(
@@ -104,7 +106,7 @@ class SettingsTab(ctk.CTkFrame):
             text="config.ini를 직접 수정한 경우 앱 재시작이 필요합니다.",
             anchor="w",
             text_color=("#6b7280", "#9ca3af"),
-            font=ctk.CTkFont(size=11),
+            font=ctk.CTkFont(family=_font_family(), size=11),
         ).grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 4))
 
         # ── config.ini 내용 (읽기 전용) ────────────────────

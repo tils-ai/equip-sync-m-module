@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
+from watcher.fonts import family as _font_family
+
 from watcher.config import Config, save_appearance
 from watcher.service import WatcherService
 
@@ -50,10 +52,10 @@ class App(ctk.CTk):
             header,
             text="DPS Mug Transfer Watcher",
             anchor="w",
-            font=ctk.CTkFont(size=15, weight="bold"),
+            font=ctk.CTkFont(family=_font_family(), size=15, weight="bold"),
         ).grid(row=0, column=0, sticky="w")
 
-        ctk.CTkLabel(header, text="테마", font=ctk.CTkFont(size=11)).grid(row=0, column=1, padx=(8, 4))
+        ctk.CTkLabel(header, text="테마", font=ctk.CTkFont(family=_font_family(), size=11)).grid(row=0, column=1, padx=(8, 4))
 
         self.theme_menu = ctk.CTkOptionMenu(
             header,
