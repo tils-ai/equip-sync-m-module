@@ -38,8 +38,9 @@ mode = a4-landscape-2up
 
 [pipeline]
 mirror = horizontal       ; horizontal | none
-fit = contain             ; contain | cover
+fit = original            ; original | contain | cover (original = 원본 사이즈 유지)
 keep_originals = true     ; true → done/originals/로 보관, false → 삭제
+oversize_action = error   ; error | single (사이즈 초과 시: error → error/로, single → 1-up 단독 출력)
 
 [printer]
 name =                    ; v2 자동 인쇄 시 사용
@@ -64,6 +65,7 @@ class Config:
     mirror: str
     fit: str
     keep_originals: bool
+    oversize_action: str
     printer_name: str
     appearance: str
     log_level: str
@@ -99,6 +101,7 @@ def load_config() -> Config:
         mirror=parser.get("pipeline", "mirror", fallback="horizontal"),
         fit=parser.get("pipeline", "fit", fallback="contain"),
         keep_originals=_bool("pipeline", "keep_originals", default=True),
+        oversize_action=parser.get("pipeline", "oversize_action", fallback="error").strip().lower(),
         printer_name=parser.get("printer", "name", fallback=""),
         appearance=parser.get("gui", "appearance", fallback="system").strip().lower(),
         log_level=parser.get("log", "level", fallback="INFO"),
@@ -117,12 +120,37 @@ def save_appearance(cfg: Config, appearance: str) -> None:
     appearance = appearance.strip().lower()
     if appearance not in {"system", "light", "dark"}:
         appearance = "system"
-
-    parser = configparser.ConfigParser(interpolation=None, inline_comment_prefixes=(";", "#"))
-    parser.read(cfg.config_path, encoding="utf-8")
-    if not parser.has_section("gui"):
-        parser.add_section("gui")
-    parser.set("gui", "appearance", appearance)
-    with cfg.config_path.open("w", encoding="utf-8") as f:
-        parser.write(f)
+    _write_setting(cfg.config_path, "gui", "appearance", appearance)
     cfg.appearance = appearance
+
+
+def save_pipeline_settings(cfg: Config, *, mirror: str, fit: str, oversize_action: str) -> None:
+    """파이프라인 옵션(mirror/fit/oversize_action)을 config.ini에 영속화."""
+    mirror = mirror.strip().lower()
+    if mirror not in {"horizontal", "none"}:
+        mirror = "horizontal"
+
+    fit = fit.strip().lower()
+    if fit not in {"original", "contain", "cover"}:
+        fit = "original"
+
+    oversize_action = oversize_action.strip().lower()
+    if oversize_action not in {"error", "single"}:
+        oversize_action = "error"
+
+    _write_setting(cfg.config_path, "pipeline", "mirror", mirror)
+    _write_setting(cfg.config_path, "pipeline", "fit", fit)
+    _write_setting(cfg.config_path, "pipeline", "oversize_action", oversize_action)
+    cfg.mirror = mirror
+    cfg.fit = fit
+    cfg.oversize_action = oversize_action
+
+
+def _write_setting(config_path: Path, section: str, key: str, value: str) -> None:
+    parser = configparser.ConfigParser(interpolation=None, inline_comment_prefixes=(";", "#"))
+    parser.read(config_path, encoding="utf-8")
+    if not parser.has_section(section):
+        parser.add_section(section)
+    parser.set(section, key, value)
+    with config_path.open("w", encoding="utf-8") as f:
+        parser.write(f)
