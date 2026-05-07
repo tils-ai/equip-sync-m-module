@@ -26,7 +26,7 @@ jobs:
           pip install pyinstaller
 
       - name: Build (PyInstaller)
-        run: pyinstaller --noconfirm --onedir --windowed --collect-data customtkinter --name equip-sync-m watcher/__main__.py
+        run: pyinstaller --noconfirm --onedir --windowed --collect-data customtkinter --collect-submodules watcher --collect-submodules gui --collect-submodules agent --name equip-sync-m main.py
 
       - name: Package zip
         shell: pwsh
