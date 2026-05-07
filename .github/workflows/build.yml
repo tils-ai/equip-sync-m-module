@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build (PyInstaller)
+        run: pyinstaller --noconfirm --onedir --windowed --collect-data customtkinter --name equip-sync-m watcher/__main__.py
+
+      - name: Package zip
+        shell: pwsh
+        run: |
+          $name = "equip-sync-m-${{ github.ref_name }}.zip"
+          Compress-Archive -Path dist/equip-sync-m -DestinationPath "dist/$name"
+          echo "ARTIFACT=dist/$name" >> $env:GITHUB_ENV
+
+      - uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
+        with:
+          files: ${{ env.ARTIFACT }}
+          generate_release_notes: true
