@@ -25,7 +25,6 @@ def _config_path() -> Path:
 
 _DEFAULT_TEMPLATE = """\
 ; equip-sync-m-module 설정
-; 자세한 명세: https://github.com/tils-ai/dps-store/blob/main/docs/print/20260507-mug-transfer-printer.md (내부)
 
 [paths]
 incoming = {base}/incoming
@@ -45,6 +44,9 @@ keep_originals = true     ; true → done/originals/로 보관, false → 삭제
 [printer]
 name =                    ; v2 자동 인쇄 시 사용
 
+[gui]
+appearance = system       ; system | light | dark
+
 [log]
 level = INFO              ; DEBUG | INFO | WARNING | ERROR
 file = {base}/logs/watcher.log
@@ -63,6 +65,7 @@ class Config:
     fit: str
     keep_originals: bool
     printer_name: str
+    appearance: str
     log_level: str
     log_file: Path
     config_path: Path
@@ -97,6 +100,7 @@ def load_config() -> Config:
         fit=parser.get("pipeline", "fit", fallback="contain"),
         keep_originals=_bool("pipeline", "keep_originals", default=True),
         printer_name=parser.get("printer", "name", fallback=""),
+        appearance=parser.get("gui", "appearance", fallback="system").strip().lower(),
         log_level=parser.get("log", "level", fallback="INFO"),
         log_file=_path("log", "file"),
         config_path=config_file,
@@ -106,3 +110,19 @@ def load_config() -> Config:
 def ensure_dirs(cfg: Config) -> None:
     for p in (cfg.incoming, cfg.processing, cfg.done, cfg.error, cfg.originals, cfg.log_file.parent):
         p.mkdir(parents=True, exist_ok=True)
+
+
+def save_appearance(cfg: Config, appearance: str) -> None:
+    """GUI 테마 선택을 config.ini에 영속화."""
+    appearance = appearance.strip().lower()
+    if appearance not in {"system", "light", "dark"}:
+        appearance = "system"
+
+    parser = configparser.ConfigParser(interpolation=None, inline_comment_prefixes=(";", "#"))
+    parser.read(cfg.config_path, encoding="utf-8")
+    if not parser.has_section("gui"):
+        parser.add_section("gui")
+    parser.set("gui", "appearance", appearance)
+    with cfg.config_path.open("w", encoding="utf-8") as f:
+        parser.write(f)
+    cfg.appearance = appearance
