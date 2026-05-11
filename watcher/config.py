@@ -116,21 +116,21 @@ def load_config() -> Config:
     )
 
 
-def ensure_dirs(cfg: Config) -> None:
-    for p in (cfg.incoming, cfg.processing, cfg.done, cfg.error, cfg.originals, cfg.log_file.parent):
+def ensure_dirs(config: Config) -> None:
+    for p in (config.incoming, config.processing, config.done, config.error, config.originals, config.log_file.parent):
         p.mkdir(parents=True, exist_ok=True)
 
 
-def save_appearance(cfg: Config, appearance: str) -> None:
+def save_appearance(config: Config, appearance: str) -> None:
     """GUI 테마 선택을 config.ini에 영속화."""
     appearance = appearance.strip().lower()
     if appearance not in {"system", "light", "dark"}:
         appearance = "system"
-    _write_setting(cfg.config_path, "gui", "appearance", appearance)
-    cfg.appearance = appearance
+    _write_setting(config.config_path, "gui", "appearance", appearance)
+    config.appearance = appearance
 
 
-def save_pipeline_settings(cfg: Config, *, mirror: str, fit: str, oversize_action: str) -> None:
+def save_pipeline_settings(config: Config, *, mirror: str, fit: str, oversize_action: str) -> None:
     """파이프라인 옵션(mirror/fit/oversize_action)을 config.ini에 영속화."""
     mirror = mirror.strip().lower()
     if mirror not in {"horizontal", "none"}:
@@ -144,21 +144,21 @@ def save_pipeline_settings(cfg: Config, *, mirror: str, fit: str, oversize_actio
     if oversize_action not in {"error", "single"}:
         oversize_action = "error"
 
-    _write_setting(cfg.config_path, "pipeline", "mirror", mirror)
-    _write_setting(cfg.config_path, "pipeline", "fit", fit)
-    _write_setting(cfg.config_path, "pipeline", "oversize_action", oversize_action)
-    cfg.mirror = mirror
-    cfg.fit = fit
-    cfg.oversize_action = oversize_action
+    _write_setting(config.config_path, "pipeline", "mirror", mirror)
+    _write_setting(config.config_path, "pipeline", "fit", fit)
+    _write_setting(config.config_path, "pipeline", "oversize_action", oversize_action)
+    config.mirror = mirror
+    config.fit = fit
+    config.oversize_action = oversize_action
 
 
-def save_printer_settings(cfg: Config, *, name: str, enabled: bool) -> None:
+def save_printer_settings(config: Config, *, name: str, enabled: bool) -> None:
     """프린터 이름/활성화 토글을 config.ini에 영속화."""
     name = (name or "").strip()
-    _write_setting(cfg.config_path, "printer", "name", name)
-    _write_setting(cfg.config_path, "printer", "enabled", "true" if enabled else "false")
-    cfg.printer_name = name
-    cfg.printer_enabled = bool(enabled)
+    _write_setting(config.config_path, "printer", "name", name)
+    _write_setting(config.config_path, "printer", "enabled", "true" if enabled else "false")
+    config.printer_name = name
+    config.printer_enabled = bool(enabled)
 
 
 def _write_setting(config_path: Path, section: str, key: str, value: str) -> None:

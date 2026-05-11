@@ -48,8 +48,8 @@ class WatcherService:
       - on_error(name): 처리 실패 시 원본 파일명
     """
 
-    def __init__(self, cfg: Config) -> None:
-        self.cfg = cfg
+    def __init__(self, config: Config) -> None:
+        self.config = config
         self._observer: Optional[BaseObserver] = None
         self._queue: Optional[PairingQueue] = None
         self._lock = threading.Lock()
@@ -69,7 +69,7 @@ class WatcherService:
             if self._running:
                 return
             self._queue = PairingQueue(self._make_pair_handler())
-            self._observer = start_observer(self.cfg.incoming, self._handle_design)
+            self._observer = start_observer(self.config.incoming, self._handle_design)
             self._restore_existing()
             self._running = True
             logger.info("watcher service started")
@@ -90,7 +90,7 @@ class WatcherService:
         if not self._queue:
             return
         existing = sorted(
-            (p for p in self.cfg.incoming.glob("*.pdf") if p.is_file()),
+            (p for p in self.config.incoming.glob("*.pdf") if p.is_file()),
             key=lambda p: p.stat().st_mtime,
         )
         for p in existing:
@@ -105,7 +105,7 @@ class WatcherService:
         except Exception:
             logger.exception("size check failed: %s → error/", path.name)
             if path.exists():
-                _move(path, self.cfg.error)
+                _move(path, self.config.error)
             return
         if not fits:
             self._handle_oversize(path)
@@ -113,15 +113,15 @@ class WatcherService:
         self._queue.add(path)
 
     def _handle_oversize(self, path: Path) -> None:
-        action = self.cfg.oversize_action
+        action = self.config.oversize_action
         if action == "single":
-            out_path = self.cfg.done / _batch_filename()
+            out_path = self.config.done / _batch_filename()
             try:
-                compose_1up(path, out_path, mirror=self.cfg.mirror, fit=self.cfg.fit)
+                compose_1up(path, out_path, mirror=self.config.mirror, fit=self.config.fit)
             except Exception:
                 logger.exception("oversize single compose failed: %s", path.name)
                 if path.exists():
-                    _move(path, self.cfg.error)
+                    _move(path, self.config.error)
                 self._notify_error(path.name)
                 return
             self._dispose_original(path)
@@ -132,28 +132,28 @@ class WatcherService:
         else:  # "error"
             logger.warning("oversize → error/: %s", path.name)
             if path.exists():
-                _move(path, self.cfg.error)
+                _move(path, self.config.error)
             self._notify_error(path.name)
 
     def _maybe_print(self, pdf_path: Path) -> bool:
         """프린터 토글이 켜져있으면 합본 PDF를 출력. 실패 시 error/로 이동하고 False."""
-        if not self.cfg.printer_enabled:
+        if not self.config.printer_enabled:
             return True
-        if not self.cfg.printer_name:
+        if not self.config.printer_name:
             logger.warning("프린터 이름 미설정 — 출력 건너뜀: %s", pdf_path.name)
             return True
         try:
             print_pdf(
                 pdf_path,
-                printer_name=self.cfg.printer_name,
-                dpi=self.cfg.render_dpi,
+                printer_name=self.config.printer_name,
+                dpi=self.config.render_dpi,
                 poppler_path=resolve_poppler_path(),
             )
             return True
         except Exception:
             logger.exception("프린터 출력 실패: %s → error/", pdf_path.name)
             if pdf_path.exists():
-                _move(pdf_path, self.cfg.error)
+                _move(pdf_path, self.config.error)
             self._notify_error(pdf_path.name)
             return False
 
@@ -174,24 +174,24 @@ class WatcherService:
     def _dispose_original(self, path: Path) -> None:
         if not path.exists():
             return
-        if self.cfg.keep_originals:
-            _move(path, self.cfg.originals)
+        if self.config.keep_originals:
+            _move(path, self.config.originals)
         else:
             path.unlink(missing_ok=True)
 
     def _make_pair_handler(self):
-        cfg = self.cfg
+        config = self.config
         service = self
 
         def on_pair(top: Path, bot: Path) -> None:
-            out_path = cfg.done / _batch_filename()
+            out_path = config.done / _batch_filename()
             try:
-                compose_2up(top, bot, out_path, mirror=cfg.mirror, fit=cfg.fit)
+                compose_2up(top, bot, out_path, mirror=config.mirror, fit=config.fit)
             except Exception:
                 logger.exception("compose failed: %s + %s", top.name, bot.name)
                 for src in {top, bot}:
                     if src.exists():
-                        _move(src, cfg.error)
+                        _move(src, config.error)
                 service._notify_error(f"{top.name} + {bot.name}")
                 return
 

@@ -21,16 +21,16 @@ logger = logging.getLogger(__name__)
 
 
 def _bootstrap() -> Config:
-    cfg = load_config()
-    setup_logging(cfg.log_file, cfg.log_level)
-    ensure_dirs(cfg)
+    config = load_config()
+    setup_logging(config.log_file, config.log_level)
+    ensure_dirs(config)
     family = register_fonts()
-    logger.info("equip-sync-m-module starting (config: %s, font: %s)", cfg.config_path, family)
-    return cfg
+    logger.info("equip-sync-m-module starting (config: %s, font: %s)", config.config_path, family)
+    return config
 
 
-def run_headless(cfg: Config) -> int:
-    service = WatcherService(cfg)
+def run_headless(config: Config) -> int:
+    service = WatcherService(config)
     service.start()
     logger.info("headless mode — Ctrl+C to stop")
     try:
@@ -43,11 +43,11 @@ def run_headless(cfg: Config) -> int:
     return 0
 
 
-def run_gui(cfg: Config) -> int:
+def run_gui(config: Config) -> int:
     # 지연 임포트 — 헤드리스 환경에서 customtkinter 없이도 동작 가능
     from watcher.gui.app import launch_app
 
-    return launch_app(cfg)
+    return launch_app(config)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -55,10 +55,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--headless", action="store_true", help="GUI 없이 콘솔에서 실행")
     args = parser.parse_args(argv)
 
-    cfg = _bootstrap()
+    config = _bootstrap()
     if args.headless:
-        return run_headless(cfg)
-    return run_gui(cfg)
+        return run_headless(config)
+    return run_gui(config)
 
 
 if __name__ == "__main__":

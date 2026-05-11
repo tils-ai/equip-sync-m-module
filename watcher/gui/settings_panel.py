@@ -53,9 +53,9 @@ class SettingsPanel(ctk.CTkFrame):
     ANIM_MS = 220
     ANIM_STEPS = 12
 
-    def __init__(self, root: ctk.CTk, cfg: Config) -> None:
+    def __init__(self, root: ctk.CTk, config: Config) -> None:
         super().__init__(root, width=self.WIDTH, corner_radius=0, fg_color=theme.SURFACE)
-        self.cfg = cfg
+        self.config = config
         # NOTE: `_root`는 tkinter 내부 메서드와 충돌하므로 별도 속성으로 보관하지 않음.
         # 필요 시 self.master 또는 self.winfo_toplevel() 사용.
         self._open = False
@@ -280,13 +280,13 @@ class SettingsPanel(ctk.CTkFrame):
         )
         self._entry_printer = ctk.CTkEntry(parent, width=200)
         self._entry_printer.grid(row=1, column=1, sticky="ew", pady=2)
-        self._entry_printer.insert(0, self.cfg.printer_name)
+        self._entry_printer.insert(0, self.config.printer_name)
 
         ctk.CTkLabel(parent, text="자동 출력", font=ctk.CTkFont(family=_font_family(), size=11)).grid(
             row=2, column=0, sticky="w", pady=2
         )
         self._printer_switch = ctk.CTkSwitch(parent, text="", onvalue=True, offvalue=False)
-        if self.cfg.printer_enabled:
+        if self.config.printer_enabled:
             self._printer_switch.select()
         else:
             self._printer_switch.deselect()
@@ -321,18 +321,18 @@ class SettingsPanel(ctk.CTkFrame):
         if enabled and not name:
             self._printer_msg.configure(text="프린터명을 먼저 입력하세요", text_color=theme.DANGER)
             return
-        save_printer_settings(self.cfg, name=name, enabled=enabled)
+        save_printer_settings(self.config, name=name, enabled=enabled)
         msg = "저장됨 — 다음 합본부터 자동 출력" if enabled else "저장됨 — 자동 출력 꺼짐 (done/에만 저장)"
         self._printer_msg.configure(text=msg, text_color=theme.SUCCESS)
 
     # ── 폴더 ──────────────────────────────────────────
     def _build_folders(self, parent) -> None:
         rows = [
-            ("incoming", self.cfg.incoming),
-            ("processing", self.cfg.processing),
-            ("done", self.cfg.done),
-            ("error", self.cfg.error),
-            ("originals", self.cfg.originals),
+            ("incoming", self.config.incoming),
+            ("processing", self.config.processing),
+            ("done", self.config.done),
+            ("error", self.config.error),
+            ("originals", self.config.originals),
         ]
         for i, (label, path) in enumerate(rows):
             ctk.CTkLabel(
@@ -365,7 +365,7 @@ class SettingsPanel(ctk.CTkFrame):
             font=menu_font,
             dropdown_font=menu_font,
         )
-        self._mirror_menu.set(MIRROR_LABELS.get(self.cfg.mirror, "좌우 반전"))
+        self._mirror_menu.set(MIRROR_LABELS.get(self.config.mirror, "좌우 반전"))
         self._mirror_menu.grid(row=0, column=1, sticky="w", pady=2)
 
         ctk.CTkLabel(parent, text="배치 방식", font=ctk.CTkFont(family=_font_family(), size=11)).grid(
@@ -378,7 +378,7 @@ class SettingsPanel(ctk.CTkFrame):
             font=menu_font,
             dropdown_font=menu_font,
         )
-        self._fit_menu.set(FIT_LABELS.get(self.cfg.fit, "원본 사이즈 유지"))
+        self._fit_menu.set(FIT_LABELS.get(self.config.fit, "원본 사이즈 유지"))
         self._fit_menu.grid(row=1, column=1, sticky="w", pady=2)
 
         ctk.CTkLabel(parent, text="사이즈 초과 시", font=ctk.CTkFont(family=_font_family(), size=11)).grid(
@@ -391,7 +391,7 @@ class SettingsPanel(ctk.CTkFrame):
             font=menu_font,
             dropdown_font=menu_font,
         )
-        self._oversize_menu.set(OVERSIZE_LABELS.get(self.cfg.oversize_action, "에러 폴더로"))
+        self._oversize_menu.set(OVERSIZE_LABELS.get(self.config.oversize_action, "에러 폴더로"))
         self._oversize_menu.grid(row=2, column=1, sticky="w", pady=2)
 
         parent.grid_columnconfigure(1, weight=1)
@@ -415,14 +415,14 @@ class SettingsPanel(ctk.CTkFrame):
         mirror = MIRROR_REVERSE.get(self._mirror_menu.get(), "horizontal")
         fit = FIT_REVERSE.get(self._fit_menu.get(), "original")
         oversize = OVERSIZE_REVERSE.get(self._oversize_menu.get(), "error")
-        save_pipeline_settings(self.cfg, mirror=mirror, fit=fit, oversize_action=oversize)
+        save_pipeline_settings(self.config, mirror=mirror, fit=fit, oversize_action=oversize)
         self._pipeline_msg.configure(text="저장됨 — 다음 처리부터 적용", text_color=theme.SUCCESS)
 
     # ── 정보 ──────────────────────────────────────────
     def _build_info(self, parent) -> None:
         ctk.CTkLabel(
             parent,
-            text=str(self.cfg.config_path),
+            text=str(self.config.config_path),
             font=ctk.CTkFont(family=_font_family(), size=10),
             anchor="w",
             wraplength=320,
@@ -434,5 +434,5 @@ class SettingsPanel(ctk.CTkFrame):
             text="config.ini 편집",
             width=120,
             font=ctk.CTkFont(family=_font_family(), size=11),
-            command=lambda: _open_in_editor(self.cfg.config_path),
+            command=lambda: _open_in_editor(self.config.config_path),
         ).grid(row=1, column=0, sticky="w", pady=2)

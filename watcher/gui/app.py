@@ -56,15 +56,15 @@ def _count_pdfs(folder: Path) -> int:
 class App(ctk.CTk):
     REFRESH_MS = 1500
 
-    def __init__(self, cfg: Config) -> None:
+    def __init__(self, config: Config) -> None:
         super().__init__()
-        self.cfg = cfg
-        self.service = WatcherService(cfg)
+        self.config = config
+        self.service = WatcherService(config)
         self.stats = SessionStats()
         self._log_queue: queue.Queue = queue.Queue()
         self._after_id: Optional[str] = None
 
-        theme.apply(cfg.appearance)
+        theme.apply(config.appearance)
 
         self.title(WINDOW_TITLE)
         self.geometry(f"{WINDOW_SIZE[0]}x{WINDOW_SIZE[1]}")
@@ -85,16 +85,16 @@ class App(ctk.CTk):
             device_label=DEVICE_LABEL,
             on_settings=self._open_settings,
             on_theme_change=self._on_theme_change,
-            appearance=cfg.appearance,
+            appearance=config.appearance,
         )
         self.header.grid(row=0, column=0, sticky="ew")
         self.header.set_pairing("unpaired")
 
-        self.cards = StatusCards(self, on_error_click=lambda: _open_folder(cfg.error))
+        self.cards = StatusCards(self, on_error_click=lambda: _open_folder(config.error))
         self.cards.grid(row=1, column=0, sticky="ew", padx=12, pady=(8, 4))
 
         # Agent worker (스토어 ID + API Key가 세팅돼야 시작 가능)
-        self.agent = AgentWorker(incoming_dir=cfg.incoming)
+        self.agent = AgentWorker(incoming_dir=config.incoming)
         self.agent.on_downloaded = self._on_agent_downloaded
         self.agent.on_error = self._on_agent_error
 
@@ -102,7 +102,7 @@ class App(ctk.CTk):
             self,
             on_toggle_agent=self._toggle_agent,
             on_toggle_watcher=self._toggle_watcher,
-            on_open_folder=lambda: _open_folder(cfg.incoming),
+            on_open_folder=lambda: _open_folder(config.incoming),
         )
         self.control.grid(row=2, column=0, sticky="ew", padx=12, pady=4)
 
@@ -116,7 +116,7 @@ class App(ctk.CTk):
         attach_logging(self._log_queue)
 
         # 슬라이드 패널 (마지막에 배치해야 lift 가능)
-        self.settings_panel = SettingsPanel(self, cfg)
+        self.settings_panel = SettingsPanel(self, config)
 
         # 서비스 콜백
         self.service.on_done = self._on_service_done
@@ -134,7 +134,7 @@ class App(ctk.CTk):
     def _on_theme_change(self, label: str) -> None:
         appearance = theme.APPEARANCE_REVERSE.get(label, "system")
         applied = theme.apply(appearance)
-        save_appearance(self.cfg, applied)
+        save_appearance(self.config, applied)
 
     def _toggle_watcher(self) -> None:
         if self.service.running:
@@ -170,7 +170,7 @@ class App(ctk.CTk):
     # ── 라이프사이클 ──────────────────────────────────
     def _start_services(self) -> None:
         self.service.start()
-        self.control.set_watcher(running=self.service.running, detail=f"감시 중 · {self.cfg.incoming.name}/")
+        self.control.set_watcher(running=self.service.running, detail=f"감시 중 · {self.config.incoming.name}/")
 
         # 페어링 됐으면 자동 시작
         state = load_state()
@@ -187,14 +187,14 @@ class App(ctk.CTk):
     def _tick(self) -> None:
         # 카드 갱신
         self.cards.set_counts(
-            pending=_count_pdfs(self.cfg.incoming),
-            processing=_count_pdfs(self.cfg.processing),
+            pending=_count_pdfs(self.config.incoming),
+            processing=_count_pdfs(self.config.processing),
             done=self.stats.done,
             error=self.stats.error,
         )
         # Watcher 상태
         if self.service.running:
-            self.control.set_watcher(running=True, detail=f"감시 중 · {self.cfg.incoming.name}/")
+            self.control.set_watcher(running=True, detail=f"감시 중 · {self.config.incoming.name}/")
         else:
             self.control.set_watcher(running=False, detail="정지됨")
 
@@ -242,7 +242,7 @@ class App(ctk.CTk):
         self.destroy()
 
 
-def launch_app(cfg: Config) -> int:
-    app = App(cfg)
+def launch_app(config: Config) -> int:
+    app = App(config)
     app.mainloop()
     return 0
