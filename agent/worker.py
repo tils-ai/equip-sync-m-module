@@ -64,10 +64,15 @@ class AgentWorker:
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._client: Optional[MugApiClient] = None
+        # 표준 콜백 셋 (g/l/m 통일) — 모두 Optional, 미지정 시 무시
         self.on_started: Optional[Callable[[], None]] = None
         self.on_stopped: Optional[Callable[[], None]] = None
         self.on_downloaded: Optional[Callable[[str], None]] = None
+        # m-module은 Watcher가 최종 출력하므로 on_done은 Agent 측에서 호출하지 않음
+        # (서비스 계층에서 WatcherService.on_done로 처리)
+        self.on_done: Optional[Callable[[str], None]] = None
         self.on_error: Optional[Callable[[str], None]] = None
+        self.on_auth_expired: Optional[Callable[[], None]] = None
 
     @property
     def running(self) -> bool:
@@ -147,6 +152,14 @@ class AgentWorker:
                             break
                         self._process_job(job)
             except requests.HTTPError as e:
+                if e.response is not None and e.response.status_code == 401:
+                    logger.error("API 키 만료 — 재인증 필요")
+                    if self.on_auth_expired:
+                        try:
+                            self.on_auth_expired()
+                        except Exception:
+                            logger.exception("on_auth_expired 콜백 예외")
+                    break
                 logger.error("API 오류: %s", e)
                 empty += 1
             except requests.RequestException as e:
