@@ -1,4 +1,4 @@
-"""config.ini 로드/생성. Windows %LOCALAPPDATA%\\equip-sync-m-module 기본 사용."""
+"""config.ini 로드/생성. exe 파일이 있는 폴더 기준 (spec §11.5)."""
 
 from __future__ import annotations
 
@@ -11,16 +11,16 @@ from pathlib import Path
 APP_NAME = "equip-sync-m-module"
 
 
-def _appdata_root() -> Path:
-    if sys.platform == "win32":
-        local = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
-        if local:
-            return Path(local) / APP_NAME
-    return Path.home() / f".{APP_NAME}"
+def _base_dir() -> Path:
+    """frozen exe면 exe 폴더, 스크립트면 main.py가 있는 프로젝트 루트."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).parent
+    # dev: main.py가 watcher/의 상위(프로젝트 루트)에 있음
+    return Path(__file__).resolve().parent.parent
 
 
 def _config_path() -> Path:
-    return _appdata_root() / "config.ini"
+    return _base_dir() / "config.ini"
 
 
 _DEFAULT_TEMPLATE = """\
@@ -74,7 +74,7 @@ class Config:
 
 
 def load_config() -> Config:
-    base = _appdata_root()
+    base = _base_dir()
     config_file = _config_path()
 
     if not config_file.exists():

@@ -12,16 +12,16 @@ from typing import Optional
 APP_NAME = "equip-sync-m-module"
 
 
-def _appdata_root() -> Path:
-    if sys.platform == "win32":
-        local = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
-        if local:
-            return Path(local) / APP_NAME
-    return Path.home() / f".{APP_NAME}"
+def _base_dir() -> Path:
+    """exe 파일 폴더 (spec §11.5)."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).parent
+    # dev: agent/state.py → 프로젝트 루트
+    return Path(__file__).resolve().parent.parent
 
 
 def _state_path() -> Path:
-    return _appdata_root() / "agent.json"
+    return _base_dir() / "agent.json"
 
 
 @dataclass
