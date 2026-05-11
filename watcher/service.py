@@ -13,6 +13,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+from typing import Callable, Optional
+
 from watchdog.observers.api import BaseObserver
 
 from .config import Config
@@ -38,7 +40,12 @@ def _move(src: Path, dst_dir: Path) -> Path:
 
 
 class WatcherService:
-    """수명주기 가능한 Watcher — start()/stop()/running."""
+    """수명주기 가능한 Watcher — start()/stop()/running.
+
+    GUI 통합용 콜백:
+      - on_done(name): 합본 완료 시 결과 파일명
+      - on_error(name): 처리 실패 시 원본 파일명
+    """
 
     def __init__(self, cfg: Config) -> None:
         self.cfg = cfg
@@ -46,6 +53,8 @@ class WatcherService:
         self._queue: Optional[PairingQueue] = None
         self._lock = threading.Lock()
         self._running = False
+        self.on_done: Optional[Callable[[str], None]] = None
+        self.on_error: Optional[Callable[[str], None]] = None
 
     @property
     def running(self) -> bool:
@@ -112,13 +121,30 @@ class WatcherService:
                 logger.exception("oversize single compose failed: %s", path.name)
                 if path.exists():
                     _move(path, self.cfg.error)
+                self._notify_error(path.name)
                 return
             self._dispose_original(path)
             logger.info("oversize → single done: %s", out_path.name)
+            self._notify_done(out_path.name)
         else:  # "error"
             logger.warning("oversize → error/: %s", path.name)
             if path.exists():
                 _move(path, self.cfg.error)
+            self._notify_error(path.name)
+
+    def _notify_done(self, name: str) -> None:
+        if self.on_done:
+            try:
+                self.on_done(name)
+            except Exception:
+                logger.exception("on_done callback failed")
+
+    def _notify_error(self, name: str) -> None:
+        if self.on_error:
+            try:
+                self.on_error(name)
+            except Exception:
+                logger.exception("on_error callback failed")
 
     def _dispose_original(self, path: Path) -> None:
         if not path.exists():
@@ -138,25 +164,23 @@ class WatcherService:
                 compose_2up(top, bot, out_path, mirror=cfg.mirror, fit=cfg.fit)
             except Exception:
                 logger.exception("compose failed: %s + %s", top.name, bot.name)
-                # 같은 파일 두 슬롯 케이스 — 중복 방지하며 error/로
                 for src in {top, bot}:
                     if src.exists():
                         _move(src, cfg.error)
+                service._notify_error(f"{top.name} + {bot.name}")
                 return
 
-            # 정상 합본 — 같은 파일이 두 슬롯에 들어간 경우(qty>=2) 한 번만 이동
             consumed: set[Path] = set()
-            # 큐에 같은 path가 더 남아있으면(qty>2) 원본 보존이 필요 — 큐 스냅샷으로 확인
             still_pending: set[Path] = set(service._queue.snapshot()) if service._queue else set()
             for src in (top, bot):
                 if src in consumed:
                     continue
                 consumed.add(src)
                 if src in still_pending:
-                    # 같은 디자인이 다음 슬롯에서도 사용됨 — 원본 유지
                     continue
                 service._dispose_original(src)
 
             logger.info("done: %s", out_path.name)
+            service._notify_done(out_path.name)
 
         return on_pair
