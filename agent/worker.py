@@ -74,12 +74,38 @@ class AgentWorker:
         return self._running
 
     def start(self) -> None:
+        """Agent 시작 — API 키 없으면 인증 플로우 자동 트리거 (가먼트 패턴)."""
         if self._running:
             return
         state = load_state()
-        if not state.paired or not state.api_key:
-            logger.error("페어링 정보 없음 — 먼저 페어링하세요.")
+        if not state.api_key:
+            if not state.tenant_name:
+                logger.error("스토어 ID 미설정 — 설정 패널에서 입력 후 다시 시도하세요.")
+                if self.on_error:
+                    self.on_error("스토어 ID 미설정")
+                return
+            logger.info("인증 시작 — tenant: %s", state.tenant_name)
+            threading.Thread(target=self._auth_and_start, args=(state,), daemon=True).start()
             return
+        self._start_polling(state)
+
+    def _auth_and_start(self, state) -> None:
+        """브라우저 Device Auth → API 키 발급 → 풀링 시작."""
+        try:
+            api_key = authenticate(state.base_url, state.tenant_name)
+            state.api_key = api_key
+            state.paired = True
+            save_state(state)
+            logger.info("인증 완료 — 풀링 시작")
+            self._start_polling(state)
+        except SystemExit:
+            return
+        except Exception:
+            logger.exception("인증 오류")
+            if self.on_error:
+                self.on_error("인증 실패")
+
+    def _start_polling(self, state) -> None:
         self._client = MugApiClient(state.base_url, state.api_key)
         self._running = True
         self._stop_event.clear()
@@ -87,7 +113,7 @@ class AgentWorker:
         self._thread.start()
         if self.on_started:
             self.on_started()
-        logger.info("Agent 시작 — %s", state.base_url)
+        logger.info("Agent 풀링 시작 — %s", state.base_url)
 
     def stop(self) -> None:
         if not self._running:
