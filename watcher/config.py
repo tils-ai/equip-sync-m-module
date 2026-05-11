@@ -35,6 +35,16 @@ originals = {base}/done/originals
 
 [layout]
 mode = a4-landscape-2up
+paper = A4                ; A4 | A3 (메타 표기에 사용, 캔버스 사이즈는 mode 고정)
+
+[overlay]
+enabled = true            ; 메타·그리드·절단선 합성 (false → base만)
+cut_margin_mm = 3         ; 절단선 외곽 마진 (mm)
+meta_corner_mm = 5        ; 메타 텍스트 모서리 여백 (mm)
+meta_font_size = 6.5      ; pt
+meta_color = #FF00FF
+grid_color = #FF00FF
+cut_color = #FF00FF
 
 [pipeline]
 mirror = horizontal       ; horizontal | none
@@ -64,6 +74,7 @@ class Config:
     error: Path
     originals: Path
     layout_mode: str
+    paper: str  # A4 | A3 — 메타 토큰에만 사용
     mirror: str
     fit: str
     keep_originals: bool
@@ -71,6 +82,13 @@ class Config:
     printer_name: str
     printer_enabled: bool
     render_dpi: int
+    overlay_enabled: bool
+    cut_margin_mm: float
+    meta_corner_mm: float
+    meta_font_size: float
+    meta_color: str
+    grid_color: str
+    cut_color: str
     appearance: str
     log_level: str
     log_file: Path
@@ -95,6 +113,12 @@ def load_config() -> Config:
         raw = parser.get(section, option, fallback=str(default)).strip().lower()
         return raw in {"1", "true", "yes", "on"}
 
+    def _float(section: str, option: str, default: float) -> float:
+        try:
+            return parser.getfloat(section, option, fallback=default)
+        except ValueError:
+            return default
+
     return Config(
         incoming=_path("paths", "incoming"),
         processing=_path("paths", "processing"),
@@ -102,6 +126,7 @@ def load_config() -> Config:
         error=_path("paths", "error"),
         originals=_path("paths", "originals"),
         layout_mode=parser.get("layout", "mode", fallback="a4-landscape-2up"),
+        paper=parser.get("layout", "paper", fallback="A4").strip().upper(),
         mirror=parser.get("pipeline", "mirror", fallback="horizontal"),
         fit=parser.get("pipeline", "fit", fallback="contain"),
         keep_originals=_bool("pipeline", "keep_originals", default=True),
@@ -109,6 +134,13 @@ def load_config() -> Config:
         printer_name=parser.get("printer", "name", fallback="").strip(),
         printer_enabled=_bool("printer", "enabled", default=False),
         render_dpi=parser.getint("printer", "render_dpi", fallback=300),
+        overlay_enabled=_bool("overlay", "enabled", default=True),
+        cut_margin_mm=_float("overlay", "cut_margin_mm", 3.0),
+        meta_corner_mm=_float("overlay", "meta_corner_mm", 5.0),
+        meta_font_size=_float("overlay", "meta_font_size", 6.5),
+        meta_color=parser.get("overlay", "meta_color", fallback="#FF00FF").strip(),
+        grid_color=parser.get("overlay", "grid_color", fallback="#FF00FF").strip(),
+        cut_color=parser.get("overlay", "cut_color", fallback="#FF00FF").strip(),
         appearance=parser.get("gui", "appearance", fallback="system").strip().lower(),
         log_level=parser.get("log", "level", fallback="INFO"),
         log_file=_path("log", "file"),
@@ -159,6 +191,22 @@ def save_printer_settings(config: Config, *, name: str, enabled: bool) -> None:
     _write_setting(config.config_path, "printer", "enabled", "true" if enabled else "false")
     config.printer_name = name
     config.printer_enabled = bool(enabled)
+
+
+def save_overlay_settings(
+    config: Config, *, paper: str, overlay_enabled: bool, cut_margin_mm: float
+) -> None:
+    """오버레이 옵션(용지·ON/OFF·절단 마진)을 config.ini에 영속화."""
+    paper = (paper or "A4").strip().upper()
+    if paper not in {"A4", "A3"}:
+        paper = "A4"
+    cut_margin_mm = max(1.0, min(10.0, float(cut_margin_mm or 3.0)))
+    _write_setting(config.config_path, "layout", "paper", paper)
+    _write_setting(config.config_path, "overlay", "enabled", "true" if overlay_enabled else "false")
+    _write_setting(config.config_path, "overlay", "cut_margin_mm", str(cut_margin_mm))
+    config.paper = paper
+    config.overlay_enabled = bool(overlay_enabled)
+    config.cut_margin_mm = cut_margin_mm
 
 
 def _write_setting(config_path: Path, section: str, key: str, value: str) -> None:

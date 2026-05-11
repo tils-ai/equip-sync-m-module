@@ -72,3 +72,47 @@ def register() -> str:
 def family() -> str:
     """캐시된 family명 반환 (register 미호출 시 fallback)."""
     return _cached_family or FALLBACK
+
+
+_reportlab_font_name: str | None = None
+REPORTLAB_FALLBACK = "Helvetica"
+
+
+def register_reportlab() -> str:
+    """reportlab에 Pretendard 폰트 등록. 실패 시 Helvetica로 폴백.
+
+    overlay PDF 생성용 — 한글 메타 텍스트(주문자명 등) 대비. otf/ttf 모두 시도한다.
+    """
+    global _reportlab_font_name
+    if _reportlab_font_name is not None:
+        return _reportlab_font_name
+    try:
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+    except ImportError:
+        _reportlab_font_name = REPORTLAB_FALLBACK
+        return _reportlab_font_name
+
+    if "Pretendard" in pdfmetrics.getRegisteredFontNames():
+        _reportlab_font_name = "Pretendard"
+        return _reportlab_font_name
+
+    font_dir = _resource_dir()
+    candidates = [
+        font_dir / "Pretendard-Regular.otf",
+        font_dir / "Pretendard-Regular.ttf",
+        font_dir / "Pretendard.otf",
+        font_dir / "Pretendard.ttf",
+    ]
+    for path in candidates:
+        if not path.is_file():
+            continue
+        try:
+            pdfmetrics.registerFont(TTFont("Pretendard", str(path)))
+            _reportlab_font_name = "Pretendard"
+            return _reportlab_font_name
+        except Exception:
+            continue
+
+    _reportlab_font_name = REPORTLAB_FALLBACK
+    return _reportlab_font_name

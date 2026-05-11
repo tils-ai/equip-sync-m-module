@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "equip-sync-m-module"
-version = "0.7.3"
+version = "0.7.4"
 description = "Mug transfer printer watcher + agent (DPS Store)"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -15,6 +15,7 @@ dependencies = [
     "requests>=2.31,<3",
     "pdf2image>=1.17,<2",
     "Pillow>=10.0,<12",
+    "reportlab>=4.0,<5",
     "pywin32>=306;sys_platform=='win32'",
 ]
 
