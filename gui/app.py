@@ -174,12 +174,15 @@ class App(ctk.CTk):
 
         # 페어링 됐으면 자동 시작
         state = load_state()
-        if state.paired:
+        if state.paired and state.api_key:
             self.agent.start()
             self.header.set_pairing("connected")
+        elif state.tenant_name:
+            self.header.set_pairing("unpaired")
+            self.control.set_agent(running=False, detail="미페어링 — Agent 시작 시 자동 인증", enabled=True)
         else:
             self.header.set_pairing("unpaired")
-            self.control.set_agent(running=False, detail="미페어링 — 설정에서 페어링 필요", enabled=True)
+            self.control.set_agent(running=False, detail="스토어 ID 미설정 — 설정 패널에서 입력", enabled=False)
 
     def _tick(self) -> None:
         # 카드 갱신
@@ -199,10 +202,12 @@ class App(ctk.CTk):
         state = load_state()
         if self.agent.running:
             self.control.set_agent(running=True, detail="풀링 중", enabled=True)
-        elif state.paired:
+        elif state.api_key and state.tenant_name:
             self.control.set_agent(running=False, detail="정지됨", enabled=True)
+        elif state.tenant_name:
+            self.control.set_agent(running=False, detail="미페어링 — Agent 시작 시 자동 인증", enabled=True)
         else:
-            self.control.set_agent(running=False, detail="미페어링 — 설정에서 페어링 필요", enabled=False)
+            self.control.set_agent(running=False, detail="스토어 ID 미설정 — 설정 패널에서 입력", enabled=False)
 
         # 마지막 활동 상대시각 갱신
         self.control.tick()
