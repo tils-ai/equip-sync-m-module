@@ -357,21 +357,40 @@ class SettingsPanel(ctk.CTkFrame):
         ctk.CTkLabel(parent, text="좌우 반전", font=ctk.CTkFont(family=_font_family(), size=11)).grid(
             row=0, column=0, sticky="w", pady=2
         )
-        self._mirror_menu = ctk.CTkOptionMenu(parent, values=list(MIRROR_LABELS.values()), width=160)
+        menu_font = ctk.CTkFont(family=_font_family(), size=11)
+        self._mirror_menu = ctk.CTkOptionMenu(
+            parent,
+            values=list(MIRROR_LABELS.values()),
+            width=160,
+            font=menu_font,
+            dropdown_font=menu_font,
+        )
         self._mirror_menu.set(MIRROR_LABELS.get(self.cfg.mirror, "좌우 반전"))
         self._mirror_menu.grid(row=0, column=1, sticky="w", pady=2)
 
         ctk.CTkLabel(parent, text="배치 방식", font=ctk.CTkFont(family=_font_family(), size=11)).grid(
             row=1, column=0, sticky="w", pady=2
         )
-        self._fit_menu = ctk.CTkOptionMenu(parent, values=list(FIT_LABELS.values()), width=160)
+        self._fit_menu = ctk.CTkOptionMenu(
+            parent,
+            values=list(FIT_LABELS.values()),
+            width=160,
+            font=menu_font,
+            dropdown_font=menu_font,
+        )
         self._fit_menu.set(FIT_LABELS.get(self.cfg.fit, "원본 사이즈 유지"))
         self._fit_menu.grid(row=1, column=1, sticky="w", pady=2)
 
         ctk.CTkLabel(parent, text="사이즈 초과 시", font=ctk.CTkFont(family=_font_family(), size=11)).grid(
             row=2, column=0, sticky="w", pady=2
         )
-        self._oversize_menu = ctk.CTkOptionMenu(parent, values=list(OVERSIZE_LABELS.values()), width=160)
+        self._oversize_menu = ctk.CTkOptionMenu(
+            parent,
+            values=list(OVERSIZE_LABELS.values()),
+            width=160,
+            font=menu_font,
+            dropdown_font=menu_font,
+        )
         self._oversize_menu.set(OVERSIZE_LABELS.get(self.cfg.oversize_action, "에러 폴더로"))
         self._oversize_menu.grid(row=2, column=1, sticky="w", pady=2)
 
