@@ -9,18 +9,23 @@ m-module 섹션:
 
 from __future__ import annotations
 
+import logging
 import os
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 import customtkinter as ctk
 
+from agent.auth import authenticate
 from agent.state import AgentState, clear_state, load_state, save_state
 from watcher.config import Config, save_pipeline_settings
 from watcher.fonts import family as _font_family
 
 from . import theme
+
+logger = logging.getLogger(__name__)
 
 MIRROR_LABELS = {"horizontal": "좌우 반전", "none": "반전 안 함"}
 MIRROR_REVERSE = {v: k for k, v in MIRROR_LABELS.items()}
@@ -144,44 +149,43 @@ class SettingsPanel(ctk.CTkFrame):
 
     # ── 페어링 ────────────────────────────────────────
     def _build_pairing(self, parent) -> None:
-        ctk.CTkLabel(
-            parent,
-            text="v0.3에서 dps-store API 연동 활성화 — 현재는 정보만 저장",
-            font=ctk.CTkFont(family=_font_family(), size=10),
-            text_color=theme.TEXT_MUTED,
-            anchor="w",
-            wraplength=320,
-            justify="left",
-        ).grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 8))
-
         ctk.CTkLabel(parent, text="Base URL", font=ctk.CTkFont(family=_font_family(), size=11)).grid(
-            row=1, column=0, sticky="w", pady=2
+            row=0, column=0, sticky="w", pady=2
         )
         self._entry_base = ctk.CTkEntry(parent, width=200)
-        self._entry_base.grid(row=1, column=1, sticky="ew", pady=2)
+        self._entry_base.grid(row=0, column=1, sticky="ew", pady=2)
         self._entry_base.insert(0, self._agent_state.base_url)
 
         ctk.CTkLabel(parent, text="스토어 ID", font=ctk.CTkFont(family=_font_family(), size=11)).grid(
-            row=2, column=0, sticky="w", pady=2
+            row=1, column=0, sticky="w", pady=2
         )
         self._entry_tenant = ctk.CTkEntry(parent, width=200)
-        self._entry_tenant.grid(row=2, column=1, sticky="ew", pady=2)
+        self._entry_tenant.grid(row=1, column=1, sticky="ew", pady=2)
         self._entry_tenant.insert(0, self._agent_state.tenant_name)
 
         ctk.CTkLabel(parent, text="API Key", font=ctk.CTkFont(family=_font_family(), size=11)).grid(
-            row=3, column=0, sticky="w", pady=2
+            row=2, column=0, sticky="w", pady=2
         )
-        self._entry_key = ctk.CTkEntry(parent, width=200, show="•")
-        self._entry_key.grid(row=3, column=1, sticky="ew", pady=2)
-        self._entry_key.insert(0, self._agent_state.api_key)
+        self._api_key_label = ctk.CTkLabel(
+            parent,
+            text=self._format_api_key(self._agent_state.api_key),
+            font=ctk.CTkFont(family=_font_family(), size=11),
+            anchor="w",
+        )
+        self._api_key_label.grid(row=2, column=1, sticky="w", pady=2)
 
         parent.grid_columnconfigure(1, weight=1)
 
         actions = ctk.CTkFrame(parent, fg_color="transparent")
-        actions.grid(row=4, column=0, columnspan=2, sticky="ew", pady=(8, 0))
-        ctk.CTkButton(
-            actions, text="저장", width=70, font=ctk.CTkFont(family=_font_family(), size=11), command=self._save_pairing
-        ).pack(side="right")
+        actions.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(8, 0))
+        self._pair_button = ctk.CTkButton(
+            actions,
+            text="지금 인증",
+            width=100,
+            font=ctk.CTkFont(family=_font_family(), size=11, weight="bold"),
+            command=self._start_pairing,
+        )
+        self._pair_button.pack(side="right")
         ctk.CTkButton(
             actions,
             text="삭제",
@@ -193,9 +197,53 @@ class SettingsPanel(ctk.CTkFrame):
         ).pack(side="right", padx=(0, 6))
 
         self._pairing_msg = ctk.CTkLabel(
-            parent, text="", anchor="w", font=ctk.CTkFont(family=_font_family(), size=10), text_color=theme.SUCCESS
+            parent,
+            text="스토어 ID 입력 후 '지금 인증'을 누르면 브라우저가 열립니다",
+            anchor="w",
+            font=ctk.CTkFont(family=_font_family(), size=10),
+            text_color=theme.TEXT_MUTED,
+            wraplength=320,
+            justify="left",
         )
-        self._pairing_msg.grid(row=5, column=0, columnspan=2, sticky="ew", pady=(4, 0))
+        self._pairing_msg.grid(row=4, column=0, columnspan=2, sticky="ew", pady=(4, 0))
+
+    @staticmethod
+    def _format_api_key(key: str) -> str:
+        return "(미설정)" if not key else f"●●●●{key[-4:]}"
+
+    def _start_pairing(self) -> None:
+        base_url = self._entry_base.get().strip() or "https://store.dpl.shop"
+        tenant = self._entry_tenant.get().strip()
+        if not tenant:
+            self._pairing_msg.configure(text="스토어 ID를 먼저 입력하세요", text_color=theme.DANGER)
+            return
+        # 입력값 먼저 저장 — 인증 성공 시 api_key까지 함께 덮어쓸 수 있도록
+        self._agent_state.base_url = base_url
+        self._agent_state.tenant_name = tenant
+        save_state(self._agent_state)
+        self._pair_button.configure(state="disabled", text="인증 중...")
+        self._pairing_msg.configure(text="브라우저에서 승인하세요", text_color=theme.TEXT_MUTED)
+        threading.Thread(target=self._run_pairing, args=(base_url, tenant), daemon=True).start()
+
+    def _run_pairing(self, base_url: str, tenant: str) -> None:
+        try:
+            api_key = authenticate(base_url, tenant)
+            self._agent_state.api_key = api_key
+            self._agent_state.paired = True
+            save_state(self._agent_state)
+            self.after(0, self._on_pairing_success)
+        except Exception as e:
+            logger.exception("인증 실패")
+            self.after(0, lambda: self._on_pairing_failed(str(e)))
+
+    def _on_pairing_success(self) -> None:
+        self._api_key_label.configure(text=self._format_api_key(self._agent_state.api_key))
+        self._pair_button.configure(state="normal", text="지금 인증")
+        self._pairing_msg.configure(text="인증 완료 — Agent를 시작할 수 있습니다", text_color=theme.SUCCESS)
+
+    def _on_pairing_failed(self, reason: str) -> None:
+        self._pair_button.configure(state="normal", text="지금 인증")
+        self._pairing_msg.configure(text=f"인증 실패: {reason}", text_color=theme.DANGER)
 
     def _save_pairing(self) -> None:
         self._agent_state.base_url = self._entry_base.get().strip() or "https://store.dpl.shop"
@@ -211,7 +259,7 @@ class SettingsPanel(ctk.CTkFrame):
         self._entry_base.delete(0, "end")
         self._entry_base.insert(0, self._agent_state.base_url)
         self._entry_tenant.delete(0, "end")
-        self._entry_key.delete(0, "end")
+        self._api_key_label.configure(text=self._format_api_key(""))
         self._pairing_msg.configure(text="삭제됨", text_color=theme.DANGER)
 
     # ── 폴더 ──────────────────────────────────────────
