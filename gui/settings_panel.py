@@ -20,7 +20,7 @@ import customtkinter as ctk
 
 from agent.auth import authenticate
 from agent.state import AgentState, clear_state, load_state, save_state
-from watcher.config import Config, save_pipeline_settings
+from watcher.config import Config, save_pipeline_settings, save_printer_settings
 from watcher.fonts import family as _font_family
 
 from . import theme
@@ -128,6 +128,7 @@ class SettingsPanel(ctk.CTkFrame):
         body.pack(fill="both", expand=True, padx=12, pady=(0, 12))
 
         self._section(body, "페어링", self._build_pairing)
+        self._section(body, "프린터", self._build_printer)
         self._section(body, "폴더", self._build_folders)
         self._section(body, "파이프라인", self._build_pipeline)
         self._section(body, "정보", self._build_info)
@@ -261,6 +262,68 @@ class SettingsPanel(ctk.CTkFrame):
         self._entry_tenant.delete(0, "end")
         self._api_key_label.configure(text=self._format_api_key(""))
         self._pairing_msg.configure(text="삭제됨", text_color=theme.DANGER)
+
+    # ── 프린터 ────────────────────────────────────────
+    def _build_printer(self, parent) -> None:
+        ctk.CTkLabel(
+            parent,
+            text="합본 PDF를 Windows 프린터로 자동 출력합니다. 미설정 시 done/에 저장만.",
+            font=ctk.CTkFont(family=_font_family(), size=10),
+            text_color=theme.TEXT_MUTED,
+            anchor="w",
+            wraplength=320,
+            justify="left",
+        ).grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 8))
+
+        ctk.CTkLabel(parent, text="프린터명", font=ctk.CTkFont(family=_font_family(), size=11)).grid(
+            row=1, column=0, sticky="w", pady=2
+        )
+        self._entry_printer = ctk.CTkEntry(parent, width=200)
+        self._entry_printer.grid(row=1, column=1, sticky="ew", pady=2)
+        self._entry_printer.insert(0, self.cfg.printer_name)
+
+        ctk.CTkLabel(parent, text="자동 출력", font=ctk.CTkFont(family=_font_family(), size=11)).grid(
+            row=2, column=0, sticky="w", pady=2
+        )
+        self._printer_switch = ctk.CTkSwitch(parent, text="", onvalue=True, offvalue=False)
+        if self.cfg.printer_enabled:
+            self._printer_switch.select()
+        else:
+            self._printer_switch.deselect()
+        self._printer_switch.grid(row=2, column=1, sticky="w", pady=2)
+
+        parent.grid_columnconfigure(1, weight=1)
+
+        actions = ctk.CTkFrame(parent, fg_color="transparent")
+        actions.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(8, 0))
+        ctk.CTkButton(
+            actions,
+            text="저장",
+            width=70,
+            font=ctk.CTkFont(family=_font_family(), size=11),
+            command=self._save_printer,
+        ).pack(side="right")
+
+        self._printer_msg = ctk.CTkLabel(
+            parent,
+            text="Windows 설정 > 프린터에서 이름을 정확히 입력하세요",
+            anchor="w",
+            font=ctk.CTkFont(family=_font_family(), size=10),
+            text_color=theme.TEXT_MUTED,
+            wraplength=320,
+            justify="left",
+        )
+        self._printer_msg.grid(row=4, column=0, columnspan=2, sticky="ew", pady=(4, 0))
+
+    def _save_printer(self) -> None:
+        name = self._entry_printer.get().strip()
+        enabled = bool(self._printer_switch.get())
+        if enabled and not name:
+            self._printer_msg.configure(text="프린터명을 먼저 입력하세요", text_color=theme.DANGER)
+            return
+        save_printer_settings(self.cfg, name=name, enabled=enabled)
+        msg = "저장됨 — 다음 합본부터 자동 출력" if enabled else "저장됨 — 자동 출력 꺼짐 (done/에만 저장)"
+        self._printer_msg.configure(text=msg, text_color=theme.SUCCESS)
 
     # ── 폴더 ──────────────────────────────────────────
     def _build_folders(self, parent) -> None:
