@@ -127,7 +127,7 @@ class SettingsPanel(ctk.CTkFrame):
         body = ctk.CTkScrollableFrame(self, fg_color="transparent")
         body.pack(fill="both", expand=True, padx=12, pady=(0, 12))
 
-        self._section(body, "페어링", self._build_pairing)
+        self._section(body, "페어링 (Agent API)", self._build_pairing)
         self._section(body, "프린터", self._build_printer)
         self._section(body, "폴더", self._build_folders)
         self._section(body, "파이프라인", self._build_pipeline)
