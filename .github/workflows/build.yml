@@ -25,8 +25,20 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
+      - name: Install poppler via MSYS2
+        id: poppler
+        shell: pwsh
+        run: |
+          C:\msys64\usr\bin\pacman.exe -S --noconfirm mingw-w64-x86_64-poppler
+          $popplerBin = "C:\msys64\mingw64\bin"
+          if (-not (Test-Path "$popplerBin\pdftoppm.exe")) {
+            Write-Error "pdftoppm.exe not found in $popplerBin"
+            exit 1
+          }
+          echo "bin=$popplerBin" >> $env:GITHUB_OUTPUT
+
       - name: Build (PyInstaller — 단일 .exe)
-        run: pyinstaller --noconfirm --onefile --windowed --collect-data customtkinter --collect-submodules watcher --collect-submodules gui --collect-submodules agent --add-data "watcher/assets/fonts;assets/fonts" --name equip-sync-m main.py
+        run: pyinstaller --noconfirm --onefile --windowed --hidden-import=win32print --hidden-import=win32ui --hidden-import=win32api --collect-data customtkinter --collect-submodules watcher --collect-submodules gui --collect-submodules agent --add-data "watcher/assets/fonts;assets/fonts" --add-data "${{ steps.poppler.outputs.bin }};poppler" --name equip-sync-m main.py
 
       - name: Rename artifact (버전 포함)
         shell: pwsh
