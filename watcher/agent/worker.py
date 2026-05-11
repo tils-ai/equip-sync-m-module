@@ -1,16 +1,18 @@
-"""머그 프린터 Agent worker — dps-store API 풀링 → PDF 다운로드 → incoming/에 저장.
+"""머그 프린터 Agent worker — dps-store API 풀링 → PDF 다운로드 → incoming/에 N개 분할 저장.
 
-저장 시 파일명: `{designId}_qty{quantity}.pdf`로 수량 정보를 인코딩.
-워처가 동일 파일을 큐에서 qty만큼 가상 복제해 페어링 처리.
+v0.7 변경: quantity=N 작업을 받으면 1회 다운로드 후 N개 PDF로 복사 + 사이드카 JSON 동반.
+파일명 규칙: `{designId}_qty{N}_{idx}.pdf` + `{designId}_qty{N}_{idx}.json`
+워처는 더 이상 가상 복제 안 하고 각 PDF를 독립 파일로 처리.
 
-dps-store 백엔드(/api/printer/mug/*) 구현 시 활성화 — v0.3 TODO 참조.
+명세: docs/print/20260511-mug-transfer-overlay.md §7
 """
 
 from __future__ import annotations
 
+import json
 import logging
+import shutil
 import threading
-import time
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -33,12 +35,10 @@ def _backoff(empty_count: int, base: float) -> float:
     return 30.0
 
 
-def _safe_filename(job: dict) -> str:
-    """파일명: {orderId or designId}_qty{quantity}.pdf — 워처가 qty를 파싱."""
+def _safe_basename(job: dict) -> str:
+    """슬롯 인덱스 인코딩 전 기본 파일명 (확장자/qty 없이)."""
     design_id = job.get("designId") or job.get("orderNumber") or job.get("id") or "design"
-    qty = int(job.get("quantity") or 1)
-    base = str(design_id).replace("/", "_").replace("\\", "_")
-    return f"{base}_qty{qty}.pdf"
+    return str(design_id).replace("/", "_").replace("\\", "_")
 
 
 def _download(url: str, dest: Path) -> bool:
@@ -175,27 +175,54 @@ class AgentWorker:
         self._running = False
 
     def _process_job(self, job: dict) -> None:
+        """1회 다운로드 → N개 PDF로 복사 + 사이드카 JSON 동반 (명세 §7)."""
         job_id = job.get("id")
         url = job.get("downloadUrl") or job.get("designUrl")
         if not job_id or not url:
             logger.warning("잘못된 job: %s", job)
             return
-        filename = _safe_filename(job)
-        dest = self.incoming_dir / filename
-        logger.info("디자인 다운로드: %s → %s", job_id, dest.name)
-        if _download(url, dest):
-            try:
-                if self._client:
-                    self._client.mark_done(job_id)
-                if self.on_downloaded:
-                    self.on_downloaded(filename)
-            except Exception:
-                logger.exception("완료 보고 실패: %s", job_id)
-        else:
-            try:
-                if self._client:
-                    self._client.mark_failed(job_id, "download failed")
-            except Exception:
-                logger.exception("실패 보고 실패: %s", job_id)
-            if self.on_error:
-                self.on_error(filename)
+        qty = max(1, int(job.get("quantity") or 1))
+        base = _safe_basename(job)
+        sidecar_payload = {
+            "identifier": job.get("identifier") or "",
+            "orderNumber": job.get("orderNumber") or "",
+        }
+        self.incoming_dir.mkdir(parents=True, exist_ok=True)
+        tmp = self.incoming_dir / f".{base}_qty{qty}.tmp.pdf"
+        logger.info("디자인 다운로드: %s (qty=%d)", job_id, qty)
+        if not _download(url, tmp):
+            self._report_failed(job_id, base, "download failed")
+            return
+
+        # N개로 복사 + 사이드카 JSON 생성
+        last_name = ""
+        try:
+            for idx in range(1, qty + 1):
+                stem = f"{base}_qty{qty}_{idx}"
+                dst_pdf = self.incoming_dir / f"{stem}.pdf"
+                dst_json = self.incoming_dir / f"{stem}.json"
+                shutil.copyfile(tmp, dst_pdf)
+                dst_json.write_text(json.dumps(sidecar_payload, ensure_ascii=False), encoding="utf-8")
+                last_name = dst_pdf.name
+            tmp.unlink(missing_ok=True)
+        except Exception:
+            logger.exception("분할 복사 실패: %s", job_id)
+            self._report_failed(job_id, base, "split failed")
+            return
+
+        try:
+            if self._client:
+                self._client.mark_done(job_id)
+            if self.on_downloaded:
+                self.on_downloaded(last_name)
+        except Exception:
+            logger.exception("완료 보고 실패: %s", job_id)
+
+    def _report_failed(self, job_id: str, base: str, reason: str) -> None:
+        try:
+            if self._client:
+                self._client.mark_failed(job_id, reason)
+        except Exception:
+            logger.exception("실패 보고 실패: %s", job_id)
+        if self.on_error:
+            self.on_error(base)
