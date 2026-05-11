@@ -33,9 +33,9 @@ class MugApiClient:
         return resp.json()
 
     def mark_done(self, job_id: str) -> None:
-        """완료 보고."""
+        """완료 보고 — backend는 /printed 엔드포인트 (가먼트와 동일)."""
         resp = self.session.post(
-            f"{self.base_url}/api/printer/mug/{job_id}/done",
+            f"{self.base_url}/api/printer/mug/{job_id}/printed",
             timeout=10,
         )
         resp.raise_for_status()
