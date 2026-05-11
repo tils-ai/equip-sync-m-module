@@ -188,7 +188,10 @@ class AgentWorker:
             "orderNumber": job.get("orderNumber") or "",
         }
         self.incoming_dir.mkdir(parents=True, exist_ok=True)
-        tmp = self.incoming_dir / f".{base}_qty{qty}.tmp.pdf"
+        # tmp는 incoming/ 밖에 둬야 watcher observer가 미완성 .pdf를 잡아가지 않는다.
+        tmp_dir = self.incoming_dir.parent / ".agent_tmp"
+        tmp_dir.mkdir(parents=True, exist_ok=True)
+        tmp = tmp_dir / f"{base}_qty{qty}.tmp.pdf"
         logger.info("디자인 다운로드: %s (qty=%d)", job_id, qty)
         if not _download(url, tmp):
             self._report_failed(job_id, base, "download failed")

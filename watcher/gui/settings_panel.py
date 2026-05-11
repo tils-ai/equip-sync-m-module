@@ -20,7 +20,7 @@ import customtkinter as ctk
 
 from watcher.agent.auth import authenticate
 from watcher.agent.state import AgentState, clear_state, load_state, save_state
-from watcher.config import Config, save_pipeline_settings, save_printer_settings
+from watcher.config import Config, save_overlay_settings, save_pipeline_settings, save_printer_settings
 from watcher.fonts import family as _font_family
 
 from . import theme
@@ -394,10 +394,43 @@ class SettingsPanel(ctk.CTkFrame):
         self._oversize_menu.set(OVERSIZE_LABELS.get(self.config.oversize_action, "에러 폴더로"))
         self._oversize_menu.grid(row=2, column=1, sticky="w", pady=2)
 
+        # 용지 사이즈 (오버레이 메타 토큰 + 향후 캔버스 확장 대비)
+        ctk.CTkLabel(parent, text="용지", font=ctk.CTkFont(family=_font_family(), size=11)).grid(
+            row=3, column=0, sticky="w", pady=2
+        )
+        self._paper_menu = ctk.CTkOptionMenu(
+            parent,
+            values=["A4", "A3"],
+            width=160,
+            font=menu_font,
+            dropdown_font=menu_font,
+        )
+        self._paper_menu.set(self.config.paper if self.config.paper in {"A4", "A3"} else "A4")
+        self._paper_menu.grid(row=3, column=1, sticky="w", pady=2)
+
+        # 오버레이 ON/OFF
+        ctk.CTkLabel(parent, text="오버레이 (메타·절단선)", font=ctk.CTkFont(family=_font_family(), size=11)).grid(
+            row=4, column=0, sticky="w", pady=2
+        )
+        self._overlay_switch = ctk.CTkSwitch(parent, text="", onvalue=True, offvalue=False)
+        if self.config.overlay_enabled:
+            self._overlay_switch.select()
+        else:
+            self._overlay_switch.deselect()
+        self._overlay_switch.grid(row=4, column=1, sticky="w", pady=2)
+
+        # 절단선 마진 (mm)
+        ctk.CTkLabel(parent, text="절단선 마진(mm)", font=ctk.CTkFont(family=_font_family(), size=11)).grid(
+            row=5, column=0, sticky="w", pady=2
+        )
+        self._cut_margin_entry = ctk.CTkEntry(parent, width=80, font=menu_font)
+        self._cut_margin_entry.grid(row=5, column=1, sticky="w", pady=2)
+        self._cut_margin_entry.insert(0, str(self.config.cut_margin_mm))
+
         parent.grid_columnconfigure(1, weight=1)
 
         actions = ctk.CTkFrame(parent, fg_color="transparent")
-        actions.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(8, 0))
+        actions.grid(row=6, column=0, columnspan=2, sticky="ew", pady=(8, 0))
         ctk.CTkButton(
             actions,
             text="저장",
@@ -409,13 +442,22 @@ class SettingsPanel(ctk.CTkFrame):
         self._pipeline_msg = ctk.CTkLabel(
             parent, text="", anchor="w", font=ctk.CTkFont(family=_font_family(), size=10), text_color=theme.SUCCESS
         )
-        self._pipeline_msg.grid(row=4, column=0, columnspan=2, sticky="ew", pady=(4, 0))
+        self._pipeline_msg.grid(row=7, column=0, columnspan=2, sticky="ew", pady=(4, 0))
 
     def _save_pipeline(self) -> None:
         mirror = MIRROR_REVERSE.get(self._mirror_menu.get(), "horizontal")
         fit = FIT_REVERSE.get(self._fit_menu.get(), "original")
         oversize = OVERSIZE_REVERSE.get(self._oversize_menu.get(), "error")
         save_pipeline_settings(self.config, mirror=mirror, fit=fit, oversize_action=oversize)
+
+        paper = self._paper_menu.get() or "A4"
+        overlay_enabled = bool(self._overlay_switch.get())
+        try:
+            cut_margin = float(self._cut_margin_entry.get())
+        except ValueError:
+            cut_margin = self.config.cut_margin_mm
+        save_overlay_settings(self.config, paper=paper, overlay_enabled=overlay_enabled, cut_margin_mm=cut_margin)
+
         self._pipeline_msg.configure(text="저장됨 — 다음 처리부터 적용", text_color=theme.SUCCESS)
 
     # ── 정보 ──────────────────────────────────────────
