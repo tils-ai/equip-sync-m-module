@@ -43,7 +43,9 @@ keep_originals = true     ; true → done/originals/로 보관, false → 삭제
 oversize_action = error   ; error | single (사이즈 초과 시: error → error/로, single → 1-up 단독 출력)
 
 [printer]
-name =                    ; v2 자동 인쇄 시 사용
+name =                    ; Windows 프린터명 (설정 > 프린터에서 정확한 이름 확인)
+enabled = false           ; true → 합본 PDF 자동 출력, false → 합본만 저장
+render_dpi = 300          ; PDF → 이미지 변환 해상도
 
 [gui]
 appearance = system       ; system | light | dark
@@ -67,6 +69,8 @@ class Config:
     keep_originals: bool
     oversize_action: str
     printer_name: str
+    printer_enabled: bool
+    render_dpi: int
     appearance: str
     log_level: str
     log_file: Path
@@ -102,7 +106,9 @@ def load_config() -> Config:
         fit=parser.get("pipeline", "fit", fallback="contain"),
         keep_originals=_bool("pipeline", "keep_originals", default=True),
         oversize_action=parser.get("pipeline", "oversize_action", fallback="error").strip().lower(),
-        printer_name=parser.get("printer", "name", fallback=""),
+        printer_name=parser.get("printer", "name", fallback="").strip(),
+        printer_enabled=_bool("printer", "enabled", default=False),
+        render_dpi=parser.getint("printer", "render_dpi", fallback=300),
         appearance=parser.get("gui", "appearance", fallback="system").strip().lower(),
         log_level=parser.get("log", "level", fallback="INFO"),
         log_file=_path("log", "file"),
@@ -144,6 +150,15 @@ def save_pipeline_settings(cfg: Config, *, mirror: str, fit: str, oversize_actio
     cfg.mirror = mirror
     cfg.fit = fit
     cfg.oversize_action = oversize_action
+
+
+def save_printer_settings(cfg: Config, *, name: str, enabled: bool) -> None:
+    """프린터 이름/활성화 토글을 config.ini에 영속화."""
+    name = (name or "").strip()
+    _write_setting(cfg.config_path, "printer", "name", name)
+    _write_setting(cfg.config_path, "printer", "enabled", "true" if enabled else "false")
+    cfg.printer_name = name
+    cfg.printer_enabled = bool(enabled)
 
 
 def _write_setting(config_path: Path, section: str, key: str, value: str) -> None:

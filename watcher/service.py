@@ -21,6 +21,7 @@ from .config import Config
 from .observer import start_observer
 from .pairing import PairingQueue, parse_qty
 from .pipeline import compose_1up, compose_2up, fits_in_2up_slot
+from .printer import print_pdf, resolve_poppler_path
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +125,8 @@ class WatcherService:
                 self._notify_error(path.name)
                 return
             self._dispose_original(path)
+            if not self._maybe_print(out_path):
+                return
             logger.info("oversize → single done: %s", out_path.name)
             self._notify_done(out_path.name)
         else:  # "error"
@@ -131,6 +134,28 @@ class WatcherService:
             if path.exists():
                 _move(path, self.cfg.error)
             self._notify_error(path.name)
+
+    def _maybe_print(self, pdf_path: Path) -> bool:
+        """프린터 토글이 켜져있으면 합본 PDF를 출력. 실패 시 error/로 이동하고 False."""
+        if not self.cfg.printer_enabled:
+            return True
+        if not self.cfg.printer_name:
+            logger.warning("프린터 이름 미설정 — 출력 건너뜀: %s", pdf_path.name)
+            return True
+        try:
+            print_pdf(
+                pdf_path,
+                printer_name=self.cfg.printer_name,
+                dpi=self.cfg.render_dpi,
+                poppler_path=resolve_poppler_path(),
+            )
+            return True
+        except Exception:
+            logger.exception("프린터 출력 실패: %s → error/", pdf_path.name)
+            if pdf_path.exists():
+                _move(pdf_path, self.cfg.error)
+            self._notify_error(pdf_path.name)
+            return False
 
     def _notify_done(self, name: str) -> None:
         if self.on_done:
@@ -179,6 +204,9 @@ class WatcherService:
                 if src in still_pending:
                     continue
                 service._dispose_original(src)
+
+            if not service._maybe_print(out_path):
+                return
 
             logger.info("done: %s", out_path.name)
             service._notify_done(out_path.name)
