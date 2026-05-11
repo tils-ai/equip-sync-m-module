@@ -45,7 +45,7 @@ def run_headless(cfg: Config) -> int:
 
 def run_gui(cfg: Config) -> int:
     # 지연 임포트 — 헤드리스 환경에서 customtkinter 없이도 동작 가능
-    from gui.app import launch_app
+    from watcher.gui.app import launch_app
 
     return launch_app(cfg)
 

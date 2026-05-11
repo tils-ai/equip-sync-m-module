@@ -18,8 +18,8 @@ from pathlib import Path
 
 import customtkinter as ctk
 
-from agent.auth import authenticate
-from agent.state import AgentState, clear_state, load_state, save_state
+from watcher.agent.auth import authenticate
+from watcher.agent.state import AgentState, clear_state, load_state, save_state
 from watcher.config import Config, save_pipeline_settings, save_printer_settings
 from watcher.fonts import family as _font_family
 

@@ -16,8 +16,8 @@ from typing import Optional
 
 import customtkinter as ctk
 
-from agent.state import load_state
-from agent.worker import AgentWorker
+from watcher.agent.state import load_state
+from watcher.agent.worker import AgentWorker
 from watcher.config import Config, save_appearance
 from watcher.service import WatcherService
 
