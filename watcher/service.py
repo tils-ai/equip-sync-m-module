@@ -5,22 +5,21 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import shutil
 import threading
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
-
 from typing import Callable, Optional
 
 from watchdog.observers.api import BaseObserver
 
 from .config import Config
 from .observer import start_observer
-from .pairing import PairingQueue, parse_qty
-from .pipeline import compose_1up, compose_2up, fits_in_2up_slot
+from .pairing import PairingQueue, parse_slot
+from .pipeline import OverlayConfig, SlotMeta, compose_1up, compose_2up, fits_in_2up_slot
 from .printer import print_pdf, resolve_poppler_path
 
 logger = logging.getLogger(__name__)
@@ -29,6 +28,14 @@ logger = logging.getLogger(__name__)
 def _batch_filename() -> str:
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
     return f"{ts}-{uuid.uuid4().hex[:6]}.pdf"
+
+
+def _paper_label(paper: str) -> str:
+    """config.paper → 메타 토큰용 문자열."""
+    p = (paper or "A4").strip().upper()
+    if p == "A3":
+        return "A3 420×297mm"
+    return "A4 297×210mm"
 
 
 def _move(src: Path, dst_dir: Path) -> Path:
@@ -117,7 +124,14 @@ class WatcherService:
         if action == "single":
             out_path = self.config.done / _batch_filename()
             try:
-                compose_1up(path, out_path, mirror=self.config.mirror, fit=self.config.fit)
+                compose_1up(
+                    path,
+                    out_path,
+                    mirror=self.config.mirror,
+                    fit=self.config.fit,
+                    meta=self._build_slot_meta(path),
+                    overlay_cfg=self._overlay_cfg(),
+                )
             except Exception:
                 logger.exception("oversize single compose failed: %s", path.name)
                 if path.exists():
@@ -172,12 +186,53 @@ class WatcherService:
                 logger.exception("on_error callback failed")
 
     def _dispose_original(self, path: Path) -> None:
-        if not path.exists():
-            return
-        if self.config.keep_originals:
-            _move(path, self.config.originals)
-        else:
-            path.unlink(missing_ok=True)
+        sidecar = path.with_suffix(".json")
+        if path.exists():
+            if self.config.keep_originals:
+                _move(path, self.config.originals)
+            else:
+                path.unlink(missing_ok=True)
+        # 사이드카 JSON도 같이 정리 (originals로 보내거나 삭제)
+        if sidecar.exists():
+            try:
+                if self.config.keep_originals:
+                    _move(sidecar, self.config.originals)
+                else:
+                    sidecar.unlink(missing_ok=True)
+            except Exception:
+                logger.exception("사이드카 처리 실패: %s", sidecar.name)
+
+    def _build_slot_meta(self, pdf_path: Path) -> SlotMeta:
+        """파일명에서 (slot, total) 추출 + 사이드카 JSON에서 identifier·orderNumber 로드."""
+        slot_index, total_slots = parse_slot(pdf_path)
+        identifier = ""
+        order_number = ""
+        sidecar = pdf_path.with_suffix(".json")
+        if sidecar.exists():
+            try:
+                data = json.loads(sidecar.read_text(encoding="utf-8"))
+                identifier = str(data.get("identifier") or "")
+                order_number = str(data.get("orderNumber") or "")
+            except Exception:
+                logger.exception("사이드카 JSON 파싱 실패: %s", sidecar.name)
+        return SlotMeta(
+            identifier=identifier,
+            order_number=order_number,
+            slot_index=slot_index,
+            total_slots=total_slots,
+            paper_label=_paper_label(self.config.paper),
+        )
+
+    def _overlay_cfg(self) -> OverlayConfig:
+        return OverlayConfig(
+            enabled=self.config.overlay_enabled,
+            cut_margin_mm=self.config.cut_margin_mm,
+            meta_corner_mm=self.config.meta_corner_mm,
+            meta_font_size=self.config.meta_font_size,
+            meta_color=self.config.meta_color,
+            grid_color=self.config.grid_color,
+            cut_color=self.config.cut_color,
+        )
 
     def _make_pair_handler(self):
         config = self.config
@@ -186,7 +241,16 @@ class WatcherService:
         def on_pair(top: Path, bot: Path) -> None:
             out_path = config.done / _batch_filename()
             try:
-                compose_2up(top, bot, out_path, mirror=config.mirror, fit=config.fit)
+                compose_2up(
+                    top,
+                    bot,
+                    out_path,
+                    mirror=config.mirror,
+                    fit=config.fit,
+                    meta_top=service._build_slot_meta(top),
+                    meta_bot=service._build_slot_meta(bot),
+                    overlay_cfg=service._overlay_cfg(),
+                )
             except Exception:
                 logger.exception("compose failed: %s + %s", top.name, bot.name)
                 for src in {top, bot}:
