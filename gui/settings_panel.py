@@ -51,7 +51,8 @@ class SettingsPanel(ctk.CTkFrame):
     def __init__(self, root: ctk.CTk, cfg: Config) -> None:
         super().__init__(root, width=self.WIDTH, corner_radius=0, fg_color=theme.SURFACE)
         self.cfg = cfg
-        self._root = root
+        # NOTE: `_root`는 tkinter 내부 메서드와 충돌하므로 별도 속성으로 보관하지 않음.
+        # 필요 시 self.master 또는 self.winfo_toplevel() 사용.
         self._open = False
         self._agent_state: AgentState = load_state()
 
