@@ -16,6 +16,8 @@ from typing import Optional
 
 import customtkinter as ctk
 
+from agent.state import load_state
+from agent.worker import AgentWorker
 from watcher.config import Config, save_appearance
 from watcher.service import WatcherService
 
@@ -91,9 +93,14 @@ class App(ctk.CTk):
         self.cards = StatusCards(self, on_error_click=lambda: _open_folder(cfg.error))
         self.cards.grid(row=1, column=0, sticky="ew", padx=12, pady=(8, 4))
 
+        # Agent worker (스토어 ID + API Key가 세팅돼야 시작 가능)
+        self.agent = AgentWorker(incoming_dir=cfg.incoming)
+        self.agent.on_downloaded = self._on_agent_downloaded
+        self.agent.on_error = self._on_agent_error
+
         self.control = OpControlBox(
             self,
-            on_toggle_agent=self._noop,
+            on_toggle_agent=self._toggle_agent,
             on_toggle_watcher=self._toggle_watcher,
             on_open_folder=lambda: _open_folder(cfg.incoming),
         )
@@ -135,8 +142,19 @@ class App(ctk.CTk):
         else:
             self.service.start()
 
-    def _noop(self) -> None:
-        pass
+    def _toggle_agent(self) -> None:
+        if self.agent.running:
+            self.agent.stop()
+        else:
+            self.agent.start()
+
+    def _on_agent_downloaded(self, name: str) -> None:
+        self.after(0, lambda: self.recent.push(ActivityItem(ts=time.time(), label=name, status="ok", detail="다운로드")))
+        self.after(0, lambda: self.control.push_activity(f"{name} 다운로드 완료"))
+
+    def _on_agent_error(self, name: str) -> None:
+        self.stats.on_error()
+        self.after(0, lambda: self.recent.push(ActivityItem(ts=time.time(), label=name, status="error", detail="다운로드 실패")))
 
     # ── 서비스 콜백 (백그라운드 스레드) ────────────────
     def _on_service_done(self, name: str) -> None:
@@ -152,9 +170,16 @@ class App(ctk.CTk):
     # ── 라이프사이클 ──────────────────────────────────
     def _start_services(self) -> None:
         self.service.start()
-        # 초기 상태 표시
-        self.control.set_watcher(running=self.service.running, detail=f"감시 중 · {self.cfg.incoming}")
-        self.control.set_agent(running=False, detail="비활성 (v0.3 예정)", enabled=False)
+        self.control.set_watcher(running=self.service.running, detail=f"감시 중 · {self.cfg.incoming.name}/")
+
+        # 페어링 됐으면 자동 시작
+        state = load_state()
+        if state.paired:
+            self.agent.start()
+            self.header.set_pairing("connected")
+        else:
+            self.header.set_pairing("unpaired")
+            self.control.set_agent(running=False, detail="미페어링 — 설정에서 페어링 필요", enabled=True)
 
     def _tick(self) -> None:
         # 카드 갱신
@@ -169,6 +194,16 @@ class App(ctk.CTk):
             self.control.set_watcher(running=True, detail=f"감시 중 · {self.cfg.incoming.name}/")
         else:
             self.control.set_watcher(running=False, detail="정지됨")
+
+        # Agent 상태
+        state = load_state()
+        if self.agent.running:
+            self.control.set_agent(running=True, detail="풀링 중", enabled=True)
+        elif state.paired:
+            self.control.set_agent(running=False, detail="정지됨", enabled=True)
+        else:
+            self.control.set_agent(running=False, detail="미페어링 — 설정에서 페어링 필요", enabled=False)
+
         # 마지막 활동 상대시각 갱신
         self.control.tick()
 
@@ -189,6 +224,10 @@ class App(ctk.CTk):
         try:
             if self._after_id:
                 self.after_cancel(self._after_id)
+        except Exception:
+            pass
+        try:
+            self.agent.stop()
         except Exception:
             pass
         try:
