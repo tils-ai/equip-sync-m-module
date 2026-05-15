@@ -37,7 +37,7 @@ jobs:
           echo "bin=$popplerBin" >> $env:GITHUB_OUTPUT
 
       - name: Build (PyInstaller — 단일 .exe)
-        run: pyinstaller --noconfirm --onefile --windowed --hidden-import=win32print --hidden-import=win32ui --hidden-import=win32api --collect-all customtkinter --collect-all reportlab --collect-submodules watcher --add-data "watcher/assets/fonts;assets/fonts" --add-data "${{ steps.poppler.outputs.bin }};poppler" --name equip-sync-m main.py
+        run: pyinstaller --noconfirm --onefile --windowed --hidden-import=win32print --hidden-import=win32ui --hidden-import=win32api --hidden-import=requests --hidden-import=urllib3 --hidden-import=certifi --hidden-import=charset_normalizer --hidden-import=idna --collect-all customtkinter --collect-all reportlab --collect-submodules watcher --add-data "watcher/assets/fonts;assets/fonts" --add-data "${{ steps.poppler.outputs.bin }};poppler" --name equip-sync-m main.py
 
       - name: Rename artifact (버전 포함)
         shell: pwsh
